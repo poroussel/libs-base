@@ -1,0 +1,43 @@
+libFuzzer harnesses for gnustep-base
+====================================
+
+These harnesses feed arbitrary bytes to the parsers and decoders that
+commonly handle untrusted data:
+
+  fuzz_plist       NSPropertyListSerialization, all formats (autodetected)
+  fuzz_bplist      binary property lists only (input prefixed by "bplist00")
+  fuzz_json        NSJSONSerialization
+  fuzz_xml         GSSloppyXMLParser (GNUstep's own XML parser, also used
+                   for XML property lists)
+  fuzz_mime        GSMimeParser, whole document and in small chunks
+  fuzz_keyed       NSKeyedUnarchiver
+  fuzz_unarchiver  NSUnarchiver
+  fuzz_portcoder   NSPortCoder (an incoming Distributed Objects message)
+
+An NSException raised for bad input is expected behaviour and is caught;
+crashes, sanitizer reports, hangs and excessive memory use are bugs.
+
+Requirements: clang with libFuzzer and AddressSanitizer, and a
+gnustep-base built (in this source tree) with instrumentation:
+
+  ./configure
+  make -C Source debug=yes \
+    ADDITIONAL_OBJCFLAGS="-fsanitize=address,fuzzer-no-link -fno-omit-frame-pointer" \
+    ADDITIONAL_CFLAGS="-fsanitize=address,fuzzer-no-link" \
+    ADDITIONAL_LDFLAGS="-fsanitize=address"
+
+Then:
+
+  CC=clang Tests/fuzz/build.sh          # builds Tests/fuzz/bin/fuzz_*
+  Tests/fuzz/bin/seedgen Tests/fuzz/corpus   # initial corpora
+  Tests/fuzz/run.sh fuzz_plist 600      # fuzz for 10 minutes
+  Tests/fuzz/triage.sh fuzz_plist       # one line per crash input
+
+seedgen is built by build.sh along with the harnesses.  run.sh keeps
+going after a crash (libFuzzer -fork=1 -ignore_crashes=1) and stores
+reproducers in Tests/fuzz/crashes/<harness>/.  To reproduce one:
+
+  ASAN_OPTIONS=detect_leaks=0 Tests/fuzz/bin/fuzz_plist <file>
+
+Leak detection is disabled because the runtime and some caches keep
+objects alive for the life of the process.
