@@ -2757,31 +2757,31 @@ bases:
       case NSNEXTSTEPStringEncoding:
 	base = Next_conv_base;
 	table = Next_uni_to_char_table;
-	tsize = Next_uni_to_char_table_size;
+	tsize = sizeof(Next_uni_to_char_table) / sizeof(_ucc_);
 	goto tables;
 
       case NSISOCyrillicStringEncoding:
 	base = Cyrillic_conv_base;
 	table = Cyrillic_uni_to_char_table;
-	tsize = Cyrillic_uni_to_char_table_size;
+	tsize = sizeof(Cyrillic_uni_to_char_table) / sizeof(_ucc_);
 	goto tables;
 
       case NSISOLatin2StringEncoding:
 	base = Latin2_conv_base;
 	table = Latin2_uni_to_char_table;
-	tsize = Latin2_uni_to_char_table_size;
+	tsize = sizeof(Latin2_uni_to_char_table) / sizeof(_ucc_);
 	goto tables;
 
       case NSISOLatin9StringEncoding:
 	base = Latin9_conv_base;
 	table = Latin9_uni_to_char_table;
-	tsize = Latin9_uni_to_char_table_size;
+	tsize = sizeof(Latin9_uni_to_char_table) / sizeof(_ucc_);
 	goto tables;
 
       case NSISOThaiStringEncoding:
         base = Thai_conv_base;
 	table = Thai_uni_to_char_table;
-	tsize = Thai_uni_to_char_table_size;
+	tsize = sizeof(Thai_uni_to_char_table) / sizeof(_ucc_);
 	goto tables;
 
 #if 0

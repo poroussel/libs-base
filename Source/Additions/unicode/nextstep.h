@@ -140,7 +140,6 @@ static unichar Next_char_to_uni_table[] =
 
 // Unicode to NextStep maping
 
-static const unsigned int Next_uni_to_char_table_size = 128;
 static _ucc_ Next_uni_to_char_table[]=
 {
   {0x00A0,0x80},

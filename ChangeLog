@@ -1,5 +1,18 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/Unicode.m: GSFromUnicode(): compute the size of
+	the conversion tables with sizeof() instead of separate constants;
+	the NeXTSTEP one said 128 entries for a table of 121.
+	* Source/Additions/unicode/nextstep.h:
+	* Source/Additions/unicode/cyrillic.h:
+	* Source/Additions/unicode/latin2.h:
+	* Source/Additions/unicode/latin9.h:
+	* Source/Additions/unicode/thai.h: Remove the table size constants.
+	* Tests/base/NSString/nextstep-from-unicode.m: Test conversion of
+	every character to NeXTSTEP.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSData.m: encodebase64(): do not add a line ending after
 	the last line, which the padding then overwrote, corrupting the
 	data when the encoded text filled the last line exactly.

@@ -111,7 +111,6 @@ static unichar Thai_char_to_uni_table[] =
 
 /* Unicode to ISO_8859-11 maping */
 
-static const unsigned int Thai_uni_to_char_table_size = 88;
 static _ucc_ Thai_uni_to_char_table[]=
 {
 	{0x00A0,0xA0},

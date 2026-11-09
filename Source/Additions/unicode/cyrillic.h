@@ -143,7 +143,6 @@ static unichar Cyrillic_char_to_uni_table[] =
 
 // Unicode to ISO_8859-5,1988 maping
 
-static const unsigned int Cyrillic_uni_to_char_table_size = 128;
 static _ucc_ Cyrillic_uni_to_char_table[]=
 {
   {0x0080,0x80},

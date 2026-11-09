@@ -145,7 +145,6 @@ static unichar Latin9_char_to_uni_table[] =
 
 // Unicode to ISO_8859-15 maping
 
-static const unsigned int Latin9_uni_to_char_table_size = 128;
 static _ucc_ Latin9_uni_to_char_table[]=
 {
   {0x0080, 0x80},
