@@ -38,6 +38,142 @@
 #import "Foundation/NSGeometry.h"
 #import "GSPThread.h"
 
+#include <ctype.h>
+
+/* Strict check of a type encoding read from an archive.  The runtime's
+ * type parsing functions (objc_sizeof_type() etc) assume well formed
+ * input: they abort() on an unknown type and read past the end of a
+ * malformed structure.  Returns a pointer just past the type, or NULL
+ * if the encoding is not one we can safely hand to the runtime.
+ */
+static const char *
+skipArchivedType(const char *t, unsigned depth)
+{
+  if (depth > 32)
+    {
+      return NULL;	// Unreasonably deeply nested
+    }
+  switch (*t++)
+    {
+      case 'c': case 'C': case 's': case 'S': case 'i': case 'I':
+      case 'l': case 'L': case 'q': case 'Q': case 'f': case 'd':
+      case 'D': case 'B': case 'v': case '?': case '#': case ':':
+      case '*':
+	return t;
+
+      case '@':
+	if ('?' == *t)
+	  {
+	    return t + 1;	// Block
+	  }
+	if ('"' == *t)
+	  {
+	    t = strchr(t + 1, '"');	// Class name
+	    return (NULL == t) ? NULL : t + 1;
+	  }
+	return t;
+
+      case 'j':
+	if (*t != '\0' && strchr("cCsSiIlLqQfdD", *t) != NULL)
+	  {
+	    return t + 1;	// Complex
+	  }
+	return NULL;
+
+      case '^':
+	return skipArchivedType(t, depth + 1);
+
+      case 'b':
+	/* GNU runtime bit-field: b<offset><type><bits> */
+	if (!isdigit((unsigned char)*t))
+	  {
+	    return NULL;
+	  }
+	while (isdigit((unsigned char)*t)) t++;
+	if (*t == '\0' || strchr("cCsSiIlLqQB", *t) == NULL)
+	  {
+	    return NULL;
+	  }
+	t++;
+	if (!isdigit((unsigned char)*t))
+	  {
+	    return NULL;
+	  }
+	while (isdigit((unsigned char)*t)) t++;
+	return t;
+
+      case '[':
+	if (!isdigit((unsigned char)*t))
+	  {
+	    return NULL;
+	  }
+	while (isdigit((unsigned char)*t)) t++;
+	t = skipArchivedType(t, depth + 1);
+	if (NULL == t || *t != ']')
+	  {
+	    return NULL;
+	  }
+	return t + 1;
+
+      case '{':
+      case '(':
+	{
+	  char	end = ('{' == t[-1]) ? '}' : ')';
+
+	  /* Name, terminated by '=' or the closing bracket. */
+	  while (*t != '\0' && *t != '=' && *t != end)
+	    {
+	      if (strchr("{}()[]\"^", *t) != NULL)
+		{
+		  return NULL;
+		}
+	      t++;
+	    }
+	  if ('=' == *t)
+	    {
+	      t++;
+	      while (*t != '\0' && *t != end)
+		{
+		  if ('"' == *t)
+		    {
+		      t = strchr(t + 1, '"');	// Field name
+		      if (NULL == t)
+			{
+			  return NULL;
+			}
+		      t++;
+		    }
+		  t = skipArchivedType(t, depth + 1);
+		  if (NULL == t)
+		    {
+		      return NULL;
+		    }
+		}
+	    }
+	  if (*t != end)
+	    {
+	      return NULL;
+	    }
+	  return t + 1;
+	}
+
+      default:
+	return NULL;
+    }
+}
+
+static BOOL
+isValidArchivedType(const char *t)
+{
+  /* Leading type qualifiers are skipped by NSGetSizeAndAlignment(). */
+  while (*t != '\0' && strchr("rnNoORV", *t) != NULL)
+    {
+      t++;
+    }
+  t = skipArchivedType(t, 0);
+  return (NULL != t && '\0' == *t) ? YES : NO;
+}
+
 @interface	GSPlaceholderValue : NSValue
 @end
 
@@ -561,8 +697,11 @@ static gs_mutex_t               placeholderLock = GS_MUTEX_INIT_STATIC;
    * crafted archive can supply size bytes with no terminator (when
    * size == sizeof(type) the stack buffer is filled completely), which
    * would over-read the buffer.  Reject a type that is not terminated.
+   * Also reject a malformed encoding, which the runtime functions used
+   * below would abort on (or read past the end of).
    */
-  if (0 == size || objctype[size - 1] != '\0')
+  if (0 == size || objctype[size - 1] != '\0'
+    || isValidArchivedType(objctype) == NO)
     {
       if (size > 64)
 	{

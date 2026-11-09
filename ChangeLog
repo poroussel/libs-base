@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSValue.m: In -initWithCoder:, reject malformed type
+	encodings (which the runtime aborts on or reads past the end of)
+	with NSInvalidArgumentException.
+	* Tests/base/NSValue/malformed-archived-type.m: Test archived
+	values with malformed type encodings.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSSet.m:
 	* Source/GSCountedSet.m:
 	* Source/GSDictionary.m: In -initWithCoder:, limit the initial
