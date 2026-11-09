@@ -34,6 +34,7 @@
 #import <Foundation/NSException.h>
 #import <Foundation/NSZone.h>
 #endif
+#include <limits.h>
 
 /** To turn assertions on, define GSI_ARRAY_CHECKS */
 //#define GSI_ARRAY_CHECKS 1
@@ -206,7 +207,7 @@ GS_STATIC_INLINE void
 GSIArrayGrow(GSIArray array)
 {
   unsigned int	next;
-  unsigned int	size;
+  size_t	size;
   GSIArrayItem	*tmp;
 
   if (array->old == 0)
@@ -221,14 +222,19 @@ GSIArrayGrow(GSIArray array)
 	  array->cap = 1;
 	}
       next = array->cap + array->old;
-      size = next*sizeof(GSIArrayItem);
+      size = (size_t)next*sizeof(GSIArrayItem);
       tmp = NSZoneMalloc(array->zone, size);
       memcpy(tmp, array->ptr, array->count * sizeof(GSIArrayItem));
     }
   else
     {
       next = array->cap + array->old;
-      size = next*sizeof(GSIArrayItem);
+      if (next < array->cap)
+	{
+	  [NSException raise: NSMallocException
+		      format: @"failed to grow GSIArray (too large)"];
+	}
+      size = (size_t)next*sizeof(GSIArrayItem);
       tmp = NSZoneRealloc(array->zone, array->ptr, size);
     }
 
@@ -245,7 +251,7 @@ GSIArrayGrow(GSIArray array)
 GS_STATIC_INLINE void
 GSIArrayGrowTo(GSIArray array, unsigned next)
 {
-  unsigned int	size;
+  size_t	size;
   GSIArrayItem	*tmp;
 
   if (next < array->count)
@@ -253,7 +259,7 @@ GSIArrayGrowTo(GSIArray array, unsigned next)
       [NSException raise: NSInvalidArgumentException
 		  format: @"attempt to shrink below count"];
     }
-  size = next*sizeof(GSIArrayItem);
+  size = (size_t)next*sizeof(GSIArrayItem);
   if (array->old == 0)
     {
       /*
@@ -838,12 +844,21 @@ GSIArrayEmpty(GSIArray array)
 GS_STATIC_INLINE GSIArray
 GSIArrayInitWithZoneAndCapacity(GSIArray array, NSZone *zone, size_t capacity)
 {
-  unsigned int	size;
+  size_t	size;
 
   array->zone = zone;
   array->count = 0;
   if (capacity < 2)
     capacity = 2;
+  if (capacity > UINT_MAX / 2)
+    {
+      /* The capacity and growth fields are unsigned int, and the
+       * buffer size must not overflow.
+       */
+      [NSException raise: NSInvalidArgumentException
+		  format: @"GSIArray capacity (%lu) too large",
+	(unsigned long)capacity];
+    }
   array->cap = capacity;
   array->old = capacity/2;
   size = capacity*sizeof(GSIArrayItem);

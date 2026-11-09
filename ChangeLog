@@ -1,5 +1,16 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Headers/GNUstepBase/GSIArray.h: Compute buffer sizes in size_t,
+	reject capacities too large for the array and check for overflow
+	when growing.
+	* Source/NSUnarchiver.m:
+	* Source/NSPortCoder.m: Limit the cross-reference table sizes read
+	from the archive/message header to the length of the data.
+	* Tests/base/NSArchiver/header-table-sizes.m: Test archives and
+	messages with huge table sizes in the header.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSData.m: In -deserializeTypeTag:andCrossRef:atCursor:,
 	discard a cross-reference claimed by the tag when the caller passes
 	a NULL pointer instead of writing through it.

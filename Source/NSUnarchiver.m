@@ -1810,6 +1810,13 @@ scalarSize(char type)
 	format: @"Archive systemVersion (%u) not recognised", version];
     }
 
+  /* The table sizes come from the archive and are only hints; each
+   * entry needs at least one byte of data, so never allocate more.
+   */
+  if (sizeC > [data length]) sizeC = [data length];
+  if (sizeO > [data length]) sizeO = [data length];
+  if (sizeP > [data length]) sizeP = [data length];
+
   if (clsMap == 0)
     {
       /*

@@ -2063,6 +2063,13 @@ scalarSize(char type)
 	  /*
 	   *	Allocate and initialise arrays to build crossref maps in.
 	   */
+	  /* The table sizes come from the message and are only hints;
+	   * each entry needs at least one byte of data, so never allocate
+	   * more than that.
+	   */
+	  if (sizeC > [_src length]) sizeC = [_src length];
+	  if (sizeO > [_src length]) sizeO = [_src length];
+	  if (sizeP > [_src length]) sizeP = [_src length];
 	  if (firstTime == YES)
 	    {
 	      _clsAry = NSZoneMalloc(_zone, sizeof(GSIArray_t)*3);
