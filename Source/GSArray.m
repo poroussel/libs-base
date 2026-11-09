@@ -1229,6 +1229,15 @@ else
       GSInlineArray	*a;
 
       [aCoder decodeValueOfObjCType: @encode(unsigned) at: &c];
+      if (GSPrivateCoderCanHold(aCoder, c) == NO)
+	{
+	  /* Don't allocate space for more objects than the archive can
+	   * possibly contain.
+	   */
+	  [NSException raise: NSInvalidArgumentException
+		      format: @"-[NSArray initWithCoder:] count (%u)"
+	    @" exceeds the remaining data", c];
+	}
 #if     GNUSTEP_WITH_ASAN         
       a = (id)NSAllocateObject(GSArrayClass, 0, [self zone]);
       a->_contents_array = (id*)NSZoneMalloc([self zone], c*sizeof(id));

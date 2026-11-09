@@ -6857,6 +6857,16 @@ static NSFileManager *fm = nil;
 	
       [aCoder decodeValueOfObjCType: @encode(unsigned) at: &count];
 
+      if (GSPrivateCoderCanHold(aCoder, count) == NO)
+	{
+	  /* Don't allocate a buffer for more characters than the archive
+	   * can possibly contain.
+	   */
+	  DESTROY(self);
+	  [NSException raise: NSInvalidArgumentException
+		      format: @"-[NSString initWithCoder:] length (%u)"
+	    @" exceeds the remaining data", count];
+	}
       if (count > 0)
         {
 	  NSStringEncoding	enc;

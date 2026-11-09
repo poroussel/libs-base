@@ -383,6 +383,14 @@ typedef enum {
 GSRunLoopThreadInfo *
 GSRunLoopInfoForThread(NSThread *aThread) GS_ATTRIB_PRIVATE;
 
+/* Returns NO if aCoder is decoding from a buffer (NSUnarchiver or
+ * NSPortCoder) in which fewer than count bytes remain, so that it cannot
+ * possibly hold count more encoded items.  Used to validate counts read
+ * from an archive before allocating memory for that many items.
+ */
+BOOL
+GSPrivateCoderCanHold(NSCoder *aCoder, NSUInteger count) GS_ATTRIB_PRIVATE;
+
 /* Used by NSException uncaught exception handler - must not call any
  * methods/functions which might cause a recursive exception.
  */

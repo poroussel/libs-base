@@ -2177,6 +2177,21 @@ scalarSize(char type)
 
 @implementation	NSPortCoder (Private)
 
+/* The number of bytes of the message not yet decoded (each encoded item
+ * uses at least one).
+ */
+- (NSUInteger) _bytesRemaining
+{
+  NSUInteger	length;
+
+  if (nil == _src)
+    {
+      return 0;
+    }
+  length = [_src length];
+  return (_cursor < length) ? length - _cursor : 0;
+}
+
 - (NSMutableArray*) _components
 {
   if (nil != _dst)

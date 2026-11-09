@@ -413,6 +413,10 @@ mapClassName(NSUnarchiverObjectInfo *info)
  *   methods rather than those in the [NSData] object.
  * </p>
  */
+@interface NSUnarchiver (GSBytesRemaining)
+- (NSUInteger) _bytesRemaining;
+@end
+
 @implementation NSUnarchiver
 
 static Class NSDataMallocClass;
@@ -1555,6 +1559,13 @@ scalarSize(char type)
 	  void		*b;
 	  NSData	*d;
 
+	  if (l > [self _bytesRemaining])
+	    {
+	      /* Don't allocate more than the archive can contain. */
+	      [NSException raise: NSInternalInconsistencyException
+			  format: @"Decoding data object with length (%u)"
+		@" exceeding the remaining data", l];
+	    }
 	  b = NSZoneMalloc(zone, l);
 	  [self decodeArrayOfObjCType: @encode(unsigned char)
 				count: l
@@ -1752,6 +1763,16 @@ scalarSize(char type)
  *  Category for compatibility with old GNUstep encoding.
  */
 @implementation	NSUnarchiver (GNUstep)
+
+/* Private: the number of bytes of the archive not yet decoded (each
+ * encoded item uses at least one).
+ */
+- (NSUInteger) _bytesRemaining
+{
+  NSUInteger	length = [data length];
+
+  return (cursor < length) ? length - cursor : 0;
+}
 
 /**
  *  Return current position within archive byte array.

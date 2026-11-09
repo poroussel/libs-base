@@ -37,6 +37,7 @@
 #import "Foundation/NSData.h"
 #import "Foundation/NSGeometry.h"
 #import "GSPThread.h"
+#import "GSPrivate.h"
 
 #include <ctype.h>
 
@@ -677,6 +678,12 @@ static gs_mutex_t               placeholderLock = GS_MUTEX_INIT_STATIC;
   int		ver;
 
   [coder decodeValueOfObjCType: @encode(unsigned) at: &size];
+  if (GSPrivateCoderCanHold(coder, size) == NO)
+    {
+      [NSException raise: NSInvalidArgumentException
+		  format: @"-[NSValue initWithCoder:] type length (%u)"
+	@" exceeds the remaining data", size];
+    }
   /*
    * For almost all type encodings, we can use space on the stack,
    * but to handle exceptionally large ones (possibly some huge structs)
@@ -820,6 +827,12 @@ static gs_mutex_t               placeholderLock = GS_MUTEX_INIT_STATIC;
 	      unsigned char	*data;
 
 	      [coder decodeValueOfObjCType: @encode(unsigned) at: &size];
+	      if (GSPrivateCoderCanHold(coder, size) == NO)
+		{
+		  [NSException raise: NSInvalidArgumentException
+			      format: @"-[NSValue initWithCoder:] data length (%u)"
+		    @" exceeds the remaining data", size];
+		}
 	      data = (void *)NSZoneMalloc(NSDefaultMallocZone(), size);
 	      [coder decodeArrayOfObjCType: @encode(unsigned char)
 				     count: size
@@ -885,6 +898,12 @@ static gs_mutex_t               placeholderLock = GS_MUTEX_INIT_STATIC;
 	  unsigned char	data[tsize];
 
 	  [coder decodeValueOfObjCType: @encode(unsigned) at: &size];
+	  if (GSPrivateCoderCanHold(coder, size) == NO)
+	    {
+	      [NSException raise: NSInvalidArgumentException
+			  format: @"-[NSValue initWithCoder:] data length (%u)"
+		@" exceeds the remaining data", size];
+	    }
 	  {
 	    /* size is decoded from the (untrusted) archive, so the serialized
 	     * buffer is heap allocated, as in the tsize > 64 case below, rather
@@ -912,6 +931,12 @@ static gs_mutex_t               placeholderLock = GS_MUTEX_INIT_STATIC;
 
 	  data = (void *)NSZoneMalloc(NSDefaultMallocZone(), tsize);
 	  [coder decodeValueOfObjCType: @encode(unsigned) at: &size];
+	  if (GSPrivateCoderCanHold(coder, size) == NO)
+	    {
+	      [NSException raise: NSInvalidArgumentException
+			  format: @"-[NSValue initWithCoder:] data length (%u)"
+		@" exceeds the remaining data", size];
+	    }
 	  {
 	    void	*serialized;
 

@@ -489,6 +489,23 @@ static unsigned	systemVersion = MAX_SUPPORTED_SYSTEM_VERSION;
 - (BOOL) _containsRawKey: (NSString*)aKey;
 @end
 
+/* Private hook implemented by NSUnarchiver and NSPortCoder, returning
+ * the number of bytes not yet decoded.
+ */
+@interface NSObject (GSCoderBytesRemaining)
+- (NSUInteger) _bytesRemaining;
+@end
+
+BOOL
+GSPrivateCoderCanHold(NSCoder *aCoder, NSUInteger count)
+{
+  if ([aCoder respondsToSelector: @selector(_bytesRemaining)])
+    {
+      return (count <= [(id)aCoder _bytesRemaining]) ? YES : NO;
+    }
+  return YES;
+}
+
 @implementation	_NSKeyedCoderOldStyleArray
 - (const void*) bytes
 {

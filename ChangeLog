@@ -1,5 +1,21 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSPrivate.h:
+	* Source/NSCoder.m: Add GSPrivateCoderCanHold() to check a count
+	read from an archive against the data remaining in the coder.
+	* Source/NSUnarchiver.m:
+	* Source/NSPortCoder.m: Add private -_bytesRemaining method.
+	In -[NSUnarchiver decodeDataObject] check the length against it.
+	* Source/NSString.m:
+	* Source/GSArray.m:
+	* Source/NSValue.m: In -initWithCoder:, reject lengths larger than
+	the remaining data before allocating (the buffers were leaked when
+	decoding then failed).
+	* Tests/base/NSArchiver/claimed-lengths.m: Test archives claiming
+	huge lengths.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSUnarchiver.m:
 	* Source/NSPortCoder.m: Raise an exception for a class
 	cross-reference to the empty entry zero instead of dereferencing it.
