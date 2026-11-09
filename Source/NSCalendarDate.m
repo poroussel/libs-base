@@ -152,7 +152,7 @@ abbrev(NSTimeZone *tz, NSDate *d)
 }
 
 static inline NSUInteger
-lastDayOfGregorianMonth(NSUInteger month, NSUInteger year)
+lastDayOfGregorianMonth(NSUInteger month, NSInteger year)
 {
   switch (month)
     {
@@ -170,9 +170,29 @@ lastDayOfGregorianMonth(NSUInteger month, NSUInteger year)
     }
 }
 
-static inline NSUInteger
-absoluteGregorianDay(NSUInteger day, NSUInteger month, NSUInteger year)
+/* Integer division rounding towards negative infinity.
+ */
+static inline NSInteger
+floorDiv(NSInteger a, NSInteger b)
 {
+  NSInteger	q = a / b;
+
+  if ((a % b) != 0 && ((a < 0) != (b < 0)))
+    {
+      q--;
+    }
+  return q;
+}
+
+/* Day 1 is 0001-01-01 in the proleptic Gregorian calendar.  Years before
+ * 1 use astronomical numbering (year 0 is 1 BC) so the day number may
+ * be zero or negative.
+ */
+static inline NSInteger
+absoluteGregorianDay(NSInteger day, NSInteger month, NSInteger year)
+{
+  NSInteger	prior = year - 1;
+
   if (month > 1)
     {
       while (--month > 0)
@@ -180,29 +200,49 @@ absoluteGregorianDay(NSUInteger day, NSUInteger month, NSUInteger year)
 	  day = day + lastDayOfGregorianMonth(month, year);
 	}
     }
-  if (year > 0)
-    {
-      year--;
-    }
   return
-    (day            // days this year
-     + 365 * year   // days in previous years ignoring leap days
-     + year/4       // Julian leap days before this year...
-     - year/100     // ...minus prior century years...
-     + year/400);   // ...plus prior years divisible by 400
+    (day                        // days this year
+     + 365 * prior              // days in previous years ignoring leap days
+     + floorDiv(prior, 4)       // Julian leap days before this year...
+     - floorDiv(prior, 100)     // ...minus prior century years...
+     + floorDiv(prior, 400));   // ...plus prior years divisible by 400
+}
+
+/* The largest number of days (about 2.7 thousand million years) either
+ * side of the common era for which we perform calendar calculations.
+ * Larger values (including infinities) are clamped so that the integer
+ * arithmetic cannot overflow, and NaN is treated as the reference date.
+ */
+#define	MAX_ABS_DAY	1.0e12
+
+static inline double
+clampedDays(NSTimeInterval when)
+{
+  double	a;
+
+  if (when != when)
+    {
+      when = 0.0;	// NaN
+    }
+  // Get reference date in terms of days
+  a = when / 86400.0;
+  // Offset by Gregorian reference
+  a += GREGORIAN_REFERENCE;
+  if (a > MAX_ABS_DAY)
+    {
+      a = MAX_ABS_DAY;
+    }
+  else if (a < -MAX_ABS_DAY)
+    {
+      a = -MAX_ABS_DAY;
+    }
+  return a;
 }
 
 static inline NSInteger
 dayOfCommonEra(NSTimeInterval when)
 {
-  NSInteger r;
-
-  // Get reference date in terms of days
-  when /= 86400.0;
-  // Offset by Gregorian reference
-  when += GREGORIAN_REFERENCE;
-  r = (NSInteger)when;
-  return r;
+  return (NSInteger)floor(clampedDays(when));
 }
 
 static void
@@ -211,16 +251,29 @@ gregorianDateFromAbsolute(NSInteger abs,
 {
   NSInteger     y;
   NSInteger     m;
+  NSInteger	cycles;
+  NSInteger	rem;
 
-  // Search forward year by year from approximate year
-  y = abs/366;
+  /* Estimate the year using the average length of a year over a 400
+   * year cycle (146097 days), then correct the estimate.  The estimate
+   * is never more than a year or so out, so the loops are short even
+   * for dates very far from the present.
+   */
+  cycles = floorDiv(abs - 1, 146097);
+  rem = (abs - 1) - cycles * 146097;
+  y = cycles * 400 + (rem * 400) / 146097 + 1;
+  while (abs < absoluteGregorianDay(1, 1, y))
+    {
+      y--;
+    }
   while (abs >= absoluteGregorianDay(1, 1, y+1))
     {
       y++;
     }
   // Search forward month by month from January
   m = 1;
-  while (abs > absoluteGregorianDay(lastDayOfGregorianMonth(m, y), m, y))
+  while (m < 12
+    && abs > absoluteGregorianDay(lastDayOfGregorianMonth(m, y), m, y))
     {
       m++;
     }
@@ -234,7 +287,8 @@ gregorianDateFromAbsolute(NSInteger abs,
  * since the reference date.
  */
 static NSTimeInterval
-GSTime(unsigned day, unsigned month, unsigned year, unsigned hour, unsigned minute, unsigned second, unsigned mil)
+GSTime(NSInteger day, NSInteger month, NSInteger year, NSInteger hour,
+  NSInteger minute, NSInteger second, NSInteger mil)
 {
   NSTimeInterval	a;
 
@@ -268,12 +322,16 @@ GSBreakTime(NSTimeInterval when,
    */
   when = floor(when * 1000.0 + 0.1) / 1000.0;
 
-  // Get reference date in terms of days
-  a = when / 86400.0;
-  // Offset by Gregorian reference
-  a += GREGORIAN_REFERENCE;
-  // result is the day of common era.
-  dayOfEra = (NSInteger)a;
+  // Get the (clamped) day of common era.
+  a = clampedDays(when);
+  if (a == MAX_ABS_DAY || a == -MAX_ABS_DAY)
+    {
+      /* Out of range: use midnight on the clamped day.
+       */
+      when = (a - GREGORIAN_REFERENCE) * 86400.0;
+    }
+  // Round down (towards the past), so times before year 1 work.
+  dayOfEra = (NSInteger)floor(a);
 
   // Calculate year, month, and day
   gregorianDateFromAbsolute(dayOfEra, day, month, year);

@@ -1,5 +1,15 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSCalendarDate.m: Use signed arithmetic in the Gregorian
+	date calculations and estimate the year from the 400 year cycle,
+	so that dates before year 1 or very far from the present no longer
+	make GSBreakTime() and the date accessors loop (practically)
+	forever.  Clamp out of range day numbers.
+	* Tests/base/NSCalendarDate/extreme-dates.m: Test dates before year
+	1 and very large time intervals.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/GSStandaloneXMLParser.m: Report a premature end
 	of document when the input ends inside a tag instead of reading
 	beyond the end of the buffer.  Make NewUTF8STR() reject negative
