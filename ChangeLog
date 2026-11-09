@@ -1,5 +1,14 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/GSStandaloneXMLParser.m: Report a premature end
+	of document when the input ends inside a tag instead of reading
+	beyond the end of the buffer.  Make NewUTF8STR() reject negative
+	lengths.
+	* Tests/base/NSXMLParser/standalone-truncated-tag.m: Test documents
+	truncated inside a tag.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Tests/base/GSMime/multipart-buffer-shift.m: Test a multipart
 	body split across parse: calls (overlapping buffer shift).
 

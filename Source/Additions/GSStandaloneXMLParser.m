@@ -51,6 +51,14 @@ NewUTF8STR(const void *ptr, int len)
 {
   NSString	*s;
 
+  if (len < 0)
+    {
+      /* A negative length means the parser's position arithmetic went
+       * wrong; never let it turn into a huge unsigned length.
+       */
+      NSLog(@"invalid string length %d in XML parser", len);
+      return nil;
+    }
   s = [[NSString alloc] initWithBytes: ptr
 			       length: len
 			     encoding: NSUTF8StringEncoding];
@@ -1466,6 +1474,16 @@ NSLog(@"_processTag <%@%@ %@>", flag?@"/": @"", tag, attributes);
                 && c != '>' && c != '/'  && c != '?')
                 {
                   c = cget(); // scan tag until we find a delimiting character
+                }
+              if (c == EOF)
+                {
+                  /* The input ends inside the tag (possibly right after
+                   * the '<'), so tp may be at the end of the buffer and
+                   * the length calculations below would be negative.
+                   */
+                  return [self _parseError:
+                    @"unexpected end of document inside tag"
+                    code: NSXMLParserPrematureDocumentEndError];
                 }
               if (*addr(tp) == '/')
                 {
