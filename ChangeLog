@@ -1,5 +1,10 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Tests/base/GSMime/multipart-buffer-shift.m: Test a multipart
+	body split across parse: calls (overlapping buffer shift).
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: Never create a tiny string from more than 8
 	characters; a ninth (nul) character overlapped the length and tag
 	bits and overflowed the buffers used by GSTinyString methods.
