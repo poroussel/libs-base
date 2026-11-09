@@ -2532,6 +2532,15 @@ failure:
 		andCrossRef: (unsigned int*)ref
 		   atCursor: (unsigned int*)cursor
 {
+  unsigned int	unwanted;
+
+  /* Callers which do not expect a cross-reference pass a NULL pointer,
+   * but the tag comes from the (untrusted) data and may claim one anyway.
+   */
+  if (0 == ref)
+    {
+      ref = &unwanted;
+    }
   [self deserializeDataAt: (void*)tag
 	       ofObjCType: @encode(uint8_t)
 		 atCursor: cursor
@@ -3767,6 +3776,15 @@ getBytes(void* dst, void* src, unsigned len, unsigned limit, unsigned *pos)
 		andCrossRef: (unsigned int*)ref
 		   atCursor: (unsigned int*)cursor
 {
+  unsigned int	unwanted;
+
+  /* Callers which do not expect a cross-reference pass a NULL pointer,
+   * but the tag comes from the (untrusted) data and may claim one anyway.
+   */
+  if (0 == ref)
+    {
+      ref = &unwanted;
+    }
   if (*cursor >= length)
     {
       [NSException raise: NSRangeException

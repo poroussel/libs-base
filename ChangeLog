@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSData.m: In -deserializeTypeTag:andCrossRef:atCursor:,
+	discard a cross-reference claimed by the tag when the caller passes
+	a NULL pointer instead of writing through it.
+	* Tests/base/NSArchiver/typetag-null-crossref.m: Test archives with
+	a corrupt array tag.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSCalendarDate.m: Use signed arithmetic in the Gregorian
 	date calculations and estimate the year from the 400 year cycle,
 	so that dates before year 1 or very far from the present no longer
