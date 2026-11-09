@@ -230,7 +230,11 @@ static SEL	objSel;
       [aCoder decodeValueOfObjCType: @encode(unsigned)
 	                         at: &count];
 
-      GSIMapInitWithZoneAndCapacity(&map, [self zone], count);
+      /* The count comes from the archive, so use it only as a bounded
+       * hint for the initial size; the map grows as items are added.
+       */
+      GSIMapInitWithZoneAndCapacity(&map, [self zone],
+        (count > 1024) ? 1024 : count);
       while (count-- > 0)
         {
 	  (*imp)(aCoder, sel, type, &key);

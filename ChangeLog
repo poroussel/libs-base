@@ -1,5 +1,14 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSSet.m:
+	* Source/GSCountedSet.m:
+	* Source/GSDictionary.m: In -initWithCoder:, limit the initial
+	capacity taken from the archived element count.
+	* Tests/base/NSArchiver/collection-counts.m: Test archived
+	collections with huge element counts.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSCountedSet.m: Encode and decode object counts through an
 	unsigned int, as described in the archive, rather than an
 	NSUInteger (which left the upper half of decoded counts
