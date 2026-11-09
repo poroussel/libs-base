@@ -1,5 +1,14 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/GSStandaloneXMLParser.m: Do not drop the last
+	character of an unquoted attribute value at the end of the input,
+	and report an error for an empty entity instead of reading beyond
+	it.
+	* Tests/base/NSXMLParser/standalone-empty-entity.m: Test incomplete
+	entities at the end of attribute values.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSValue.m: In -initWithCoder:, reject malformed type
 	encodings (which the runtime aborts on or reads past the end of)
 	with NSInvalidArgumentException.

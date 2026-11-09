@@ -888,6 +888,15 @@ NSLog(@"_processTag <%@%@ %@>", flag?@"/": @"", tag, attributes);
 {
   NSString      *entity;
 
+  if (len <= 0)
+    {
+      /* An '&' with nothing after it (e.g. at the end of a quoted
+       * value): there is no entity name to look at.
+       */
+      [self _parseError: @"empty entity reference"
+		   code: NSXMLParserEntityRefAtEOFError];
+      return @"";
+    }
   if (*ep == '#')
     {
       /* The maximum unicode codepoint is defined as U+10FFFF
@@ -1071,7 +1080,10 @@ NSLog(@"_processTag <%@%@ %@>", flag?@"/": @"", tag, attributes);
             }
           c = cget();
         }
-      this->cp--;  // go back to terminating character
+      if (c != EOF)
+        {
+          this->cp--;  // go back to terminating character
+        }
       len = this->cp - ap;
     }
   if (YES == containsEntity)
