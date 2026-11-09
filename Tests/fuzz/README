@@ -23,6 +23,14 @@ commonly handle untrusted data:
   fuzz_encoding    NSString conversion from and to every available encoding
   fuzz_base64      base64 and hexadecimal decoders, encode/decode round trips
   fuzz_tzif        NSTimeZone from TZif (tzfile) data
+  fuzz_format      GSFormat (-initWithFormat:...) with arbitrary format strings
+                   (see the harness for how the arguments are made safe)
+  fuzz_scanner     NSScanner, a sequence of scan operations on a string
+  fuzz_decimal     NSDecimalNumber/NSDecimal parsing, arithmetic, rounding
+  fuzz_calendardate NSCalendarDate parsing and printing with calendar formats
+  fuzz_regex       NSRegularExpression (GNUstep's code around ICU uregex)
+  fuzz_charset     NSCharacterSet from bitmap data; run it with MAXLEN=40000
+                   so that inputs can cover more than the first plane
 
 An NSException raised for bad input is expected behaviour and is caught;
 crashes, sanitizer reports, hangs and excessive memory use are bugs.

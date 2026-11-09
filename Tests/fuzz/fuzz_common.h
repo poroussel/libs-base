@@ -24,10 +24,11 @@ LLVMFuzzerTestOneInput(const uint8_t *bytes, size_t size)
 
   NS_DURING
     {
-      NSData	*d = [[NSData alloc] initWithBytes: bytes length: size];
+      /* Autoreleased, so that it is not leaked when fuzz_one() raises. */
+      NSData	*d = [[[NSData alloc] initWithBytes: bytes length: size]
+	autorelease];
 
       fuzz_one(d);
-      [d release];
     }
   NS_HANDLER
     {

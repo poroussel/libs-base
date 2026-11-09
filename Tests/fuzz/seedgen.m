@@ -242,6 +242,75 @@ main(int argc, char **argv)
       }
   }
 
+  /* Seeds for the parsers of program supplied strings. */
+  {
+    NSArray	*a;
+    NSUInteger	j;
+
+    a = [NSArray arrayWithObjects: @"%d %i %u %x %X %o %c %%",
+      @"%@ and %s", @"%5.2f|%-10e|%+g|%#a|%E|%G", @"%*d %.*s %-*.*@",
+      @"%lld %llu %hhd %hd %ld %zu %td %jd %qd", @"%p %ls %S %C %lc",
+      @"%08.3Lf %'d % d", @"plain text, no directives", @"%", @"%-#0+ 12.7@",
+      nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_format", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects:
+      @"\x01\x02\x03\x07\n  -123 0x1F 3.5e10 abc",
+      @"\x40\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0b\n42 -9223372036854775809 18446744073709551616",
+      @"\x20\x07\x06\x0b\x10\n1,5 2.25 -0,0 1e-400 inf nan",
+      @"\x60\x08\x09\x0b\x0c\n0x1.8p3 -0X.1P-2 ab xyz",
+      @"\x01\x0a\x0a\x0a\n123456789012345678901234567890.123456789e-20",
+      nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_scanner", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects: @"123.456\n-0.001", @"1e127\n1e-128",
+      @"99999999999999999999999999999999999999\n3",
+      @"-.5\n0", @"NaN\n1", @"12345678901234567890.1234567890e-40\n7\nx",
+      @"0.000000000000000000000000000001\n-1e10", @"3,14\n2,5\nlocale", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_decimal", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects:
+      @"%Y-%m-%d %H:%M:%S %z\n2024-02-29 13:05:09 +0100",
+      @"%a, %d %b %Y %I:%M:%S %p %Z\nThu, 29 Feb 2024 01:05:09 PM GMT",
+      @"%A %B %e %y %j %F %w %c\nThursday February 29 24 060 123 4",
+      @"%x %X %%\n02/29/24 13:05:09 %",
+      @"%Y%m%dT%H%M%S%z\n20240229T130509-0800",
+      @"%d/%m/%Y %H.%M\n31/12/1999 23.59", @"%G-W%V-%u\n2024-W09-4", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_calendardate", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects:
+      @"\x01(a)(X)?b\n[$1|$2]\nabc aXbc", @"\x01\\w+\n$0$0\nhello world",
+      @"\x08^\\d+$\n#\n12\n34\nx5",
+      @"\x02(?<n>\\p{L}+)\\s*\n\\$${n}\nété ok",
+      @"\x10" @"a.c\n\\\\$1\nabc a\nc", @"\x01(?i)(\\b\\w)(\\w*)\n$2$1\nThe Quick Fox",
+      nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_regex", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    {
+      NSArray	*sets = [NSArray arrayWithObjects:
+	[NSCharacterSet letterCharacterSet],
+	[NSCharacterSet whitespaceCharacterSet],
+	[NSCharacterSet characterSetWithCharactersInString:
+	  [NSString stringWithFormat: @"az%C%C", 0xd83d, 0xde00]],
+	[NSCharacterSet characterSetWithRange: NSMakeRange(0x10000, 300)],
+	nil];
+
+      for (j = 0; j < [sets count]; j++)
+	put(@"fuzz_charset", [NSString stringWithFormat: @"%lu",
+	  (unsigned long)j], [[sets objectAtIndex: j] bitmapRepresentation]);
+    }
+  }
+
   [pool drain];
   return 0;
 }

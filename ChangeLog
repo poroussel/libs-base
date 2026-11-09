@@ -1,5 +1,20 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Tests/fuzz/fuzz_format.m:
+	* Tests/fuzz/fuzz_scanner.m:
+	* Tests/fuzz/fuzz_decimal.m:
+	* Tests/fuzz/fuzz_calendardate.m:
+	* Tests/fuzz/fuzz_regex.m:
+	* Tests/fuzz/fuzz_charset.m: New libFuzzer harnesses for parsers of
+	program supplied strings.
+	* Tests/fuzz/seedgen.m: Generate seeds for them.
+	* Tests/fuzz/run.sh: Allow the maximum input length to be changed.
+	* Tests/fuzz/fuzz_common.h: Autorelease the input data, so that it
+	is not leaked when the code under test raises an exception.
+	* Tests/fuzz/README: Document them.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/GSMime.m: -decodeData:fromRange:intoData:withContext:
 	size the output buffer for chunked data from the data decoded so far
 	and the input, not from the size announced in the chunk header.
