@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSCountedSet.m: Encode and decode object counts through an
+	unsigned int, as described in the archive, rather than an
+	NSUInteger (which left the upper half of decoded counts
+	uninitialised).
+	* Tests/base/NSCountedSet/archiving.m: Test archiving counts.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSSerializer.m: Check string and data lengths against the
 	remaining data before allocating, and limit the initial capacity of
 	arrays and dictionaries to the remaining data length.

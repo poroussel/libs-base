@@ -172,8 +172,11 @@
 
   while (node != 0)
     {
+      /* The archive format stores each count as an unsigned int. */
+      unsigned	valcnt = (unsigned)node->value.nsu;
+
       (*imp1)(aCoder, sel1, node->key.obj);
-      (*imp2)(aCoder, sel2, type, &node->value.nsu);
+      (*imp2)(aCoder, sel2, type, &valcnt);
       node = GSIMapEnumeratorNextNode(&enumerator);
     }
   GSIMapEndEnumerator(&enumerator);
@@ -200,7 +203,7 @@
 {
   unsigned	count;
   id		value;
-  NSUInteger	valcnt;
+  unsigned	valcnt;
   SEL		sel = @selector(decodeValueOfObjCType:at:);
   IMP		imp = [aCoder methodForSelector: sel];
   const char	*utype = @encode(unsigned);
@@ -213,7 +216,8 @@
     {
       (*imp)(aCoder, sel, otype, &value);
       (*imp)(aCoder, sel, utype, &valcnt);
-      GSIMapAddPairNoRetain(&map, (GSIMapKey)value, (GSIMapVal)valcnt);
+      GSIMapAddPairNoRetain(&map, (GSIMapKey)value,
+	(GSIMapVal)(NSUInteger)valcnt);
     }
 
   return self;
