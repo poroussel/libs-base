@@ -13,9 +13,21 @@ commonly handle untrusted data:
   fuzz_keyed       NSKeyedUnarchiver
   fuzz_unarchiver  NSUnarchiver
   fuzz_portcoder   NSPortCoder (an incoming Distributed Objects message)
+  fuzz_http        an HTTP response handled as NSURLProtocol does: GSMimeParser
+                   in HTTP mode, NSHTTPURLResponse, redirects, cookies and
+                   WWW-Authenticate challenges (GSHTTPAuthentication)
+  fuzz_cookie      NSHTTPCookie Set-Cookie/Set-Cookie2 parsing
+  fuzz_url         NSURL (absolute and relative) and NSURLComponents
+  fuzz_uritemplate GSURITemplate (RFC 6570) parsing and expansion
+  fuzz_predicate   NSPredicate/NSExpression format parsing
+  fuzz_encoding    NSString conversion from and to every available encoding
+  fuzz_base64      base64 and hexadecimal decoders, encode/decode round trips
+  fuzz_tzif        NSTimeZone from TZif (tzfile) data
 
 An NSException raised for bad input is expected behaviour and is caught;
 crashes, sanitizer reports, hangs and excessive memory use are bugs.
+fuzz_base64 also aborts when an encode/decode round trip does not give
+back the input.
 
 Requirements: clang with libFuzzer and AddressSanitizer, and a
 gnustep-base built (in this source tree) with instrumentation:

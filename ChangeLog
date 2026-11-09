@@ -1,5 +1,19 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Tests/fuzz/fuzz_http.m:
+	* Tests/fuzz/fuzz_cookie.m:
+	* Tests/fuzz/fuzz_url.m:
+	* Tests/fuzz/fuzz_uritemplate.m:
+	* Tests/fuzz/fuzz_predicate.m:
+	* Tests/fuzz/fuzz_encoding.m:
+	* Tests/fuzz/fuzz_base64.m:
+	* Tests/fuzz/fuzz_tzif.m: New libFuzzer harnesses for string level
+	parsers.
+	* Tests/fuzz/seedgen.m: Generate seeds for them.
+	* Tests/fuzz/README: Document them.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/Unicode.m: GSToUnicode(): fail for bytes beyond
 	the end of the NeXTSTEP (0xfe, 0xff) and other conversion tables
 	instead of reading past them, reject GSM 03.38 bytes above 0x7f, and

@@ -139,6 +139,109 @@ main(int argc, char **argv)
       [c release];
     }
 
+  /* Seeds for the string parsers. */
+  {
+    NSArray	*a;
+    NSUInteger	j;
+
+    a = [NSArray arrayWithObjects:
+      @"http://user:pw@www.example.com:8080/a/b/c.html;p=1?q=1&r=%20#frag",
+      @"https://[::1]:443/x\n../y/./z?a#b",
+      @"file:///tmp/a%20b/c.txt\n//host/share",
+      @"mailto:someone@example.com\n?subject=hi",
+      @"ftp://ftp.example.com/pub/\n;type=i",
+      @"http://a/b/c/d;p?q\n../../../g",
+      @"//example.com:/path\n#only",
+      @"data:text/plain;base64,SGVsbG8=",
+      @"relative/path?x=%E2%82%AC", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_url", [NSString stringWithFormat: @"%lu", (unsigned long)j],
+	utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects: @"{var}", @"{+path}/here", @"{#hello}",
+      @"X{.list*}", @"{/list,var}", @"{;keys*}", @"{?var,hello,empty}",
+      @"{&list}", @"{var:3}{hello:5}", @"http://h/{+path:6}/{?keys*}",
+      @"{undef}{n}{null}", @"%7B{var}%7D", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_uritemplate", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects:
+      @"name == 'value' AND n > 2", @"%K == %@", @"name BEGINSWITH[cd] \"va\"",
+      @"ANY list IN {'a', 'b'}", @"SUBQUERY(list, $x, $x == 'a').@count > 0",
+      @"n BETWEEN {1, 5}", @"name MATCHES 'v.*' OR NOT (n < 1)",
+      @"sub.x LIKE[c] %@", @"list[FIRST] == 'a' && list[SIZE] = 3",
+      @"FUNCTION(name, 'length') == 5", @"n + 2 * 3 - 1 / 4 ** 2 == $V",
+      @"TRUEPREDICATE", @"%@ CONTAINS name", @"list[1] ==[n] 'b'",
+      @"0x1F == 31 AND 1e3 > 0.5 AND nil == NULL", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_predicate", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects: @"aGVsbG8gd29ybGQ=", @"YQ==\r\nYg==",
+      @"QUJD REVG\n", @"////", @"0123456789abcdefABCDEF", @"<01 02 0a>",
+      @"=", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_base64", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    for (j = 0; j < 64; j++)
+      {
+	char	b[] = "\x00\x00hello \xe9t\xe9 \x1b$B\x30\x22\x1b(B \xc3\xa9 \x80\xff";
+
+	b[0] = j;
+	b[1] = j * 7;
+	put(@"fuzz_encoding", [NSString stringWithFormat: @"%lu",
+	  (unsigned long)j], [NSData dataWithBytes: b length: sizeof(b) - 1]);
+      }
+
+    a = [NSArray arrayWithObjects:
+      @"http://www.example.com/a/b\nSet-Cookie: id=a3fWa; Expires=Wed, 21 Oct 2015 07:28:00 GMT; Path=/; Domain=.example.com; Secure; HttpOnly",
+      @"https://x.org/\nSet-Cookie: a=b, c=d; max-age=100; path=/p",
+      @"http://h/\nSet-Cookie2: n=\"v\"; Version=1; Port=\"80,8080\"; Comment=\"c\"; CommentURL=\"http://h/c\"; Discard",
+      @"http://h:81/\nSet-Cookie: x=\"quoted;value\"; Expires=Thu, 01-Jan-1970 00:00:01 GMT",
+      nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_cookie", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+    a = [NSArray arrayWithObjects:
+      @"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+	@"Content-Disposition: attachment; filename=\"r\\\"e.txt\"\r\n"
+	@"Transfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n",
+      @"HTTP/1.1 302 Found\r\nLocation: ../other?x=1\r\nSet-Cookie: s=1; Path=/\r\n"
+	@"Content-Length: 0\r\n\r\n",
+      @"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"r@h\", "
+	@"qop=\"auth,auth-int\", nonce=\"dcd98b7102dd2f0e8b11d0f600bfb0c093\", "
+	@"opaque=\"5ccc069c403ebaf9f0171e9517f40e41\", algorithm=MD5\r\n"
+	@"Content-Length: 0\r\n\r\n",
+      @"HTTP/1.0 401 No\r\nWWW-Authenticate: Basic realm=\"x\"\r\n\r\n",
+      @"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n",
+      @"HTTP/1.1 200 OK\r\nContent-Type: multipart/byteranges; boundary=B\r\n\r\n"
+	@"--B\r\nContent-Range: bytes 0-1/4\r\n\r\nab\r\n--B--\r\n", nil];
+    for (j = 0; j < [a count]; j++)
+      put(@"fuzz_http", [NSString stringWithFormat: @"%lu",
+	(unsigned long)j], utf8([a objectAtIndex: j]));
+
+  }
+
+  /* NSTimeZone: the zones shipped with the system, if any. */
+  {
+    NSArray	*zones = [NSArray arrayWithObjects: @"UTC", @"Europe/Paris",
+      @"America/New_York", @"Australia/Lord_Howe", @"Asia/Kolkata",
+      @"America/Sao_Paulo", @"Pacific/Chatham", @"Africa/Casablanca", nil];
+    NSUInteger	j;
+
+    for (j = 0; j < [zones count]; j++)
+      {
+	NSString	*z = [zones objectAtIndex: j];
+
+	put(@"fuzz_tzif", [z stringByReplacingOccurrencesOfString: @"/"
+	  withString: @"_"], [NSData dataWithContentsOfFile:
+	  [@"/usr/share/zoneinfo" stringByAppendingPathComponent: z]]);
+      }
+  }
+
   [pool drain];
   return 0;
 }
