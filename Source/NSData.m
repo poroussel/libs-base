@@ -207,7 +207,12 @@ encodebase64(unsigned char **dstRef,
       dst[dIndex++] = b64[((c1 << 2) & 074) | ((c2 >> 6) & 03)];
       dst[dIndex++] = b64[c2 & 077];
       dIndexNoNewLines += 4;
-      if (lineLength && !(dIndexNoNewLines % lineLength) )
+      /* A full line gets a line ending, unless it is the last one: the
+       * padding below must replace the last characters of data, and
+       * there is no line ending after the last line.
+       */
+      if (lineLength && !(dIndexNoNewLines % lineLength)
+	&& sIndex + 3 < length)
         {
           if (options & NSDataBase64EncodingEndLineWithCarriageReturn)
             dst[dIndex++] = '\r';

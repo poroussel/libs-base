@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSData.m: encodebase64(): do not add a line ending after
+	the last line, which the padding then overwrote, corrupting the
+	data when the encoded text filled the last line exactly.
+	* Tests/base/NSData/base64-line-boundary.m: Test encoding with line
+	lengths for every data length up to 200 bytes.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Tests/fuzz/fuzz_http.m:
 	* Tests/fuzz/fuzz_cookie.m:
 	* Tests/fuzz/fuzz_url.m:
