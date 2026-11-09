@@ -1,5 +1,12 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/GSObjCRuntime.m: GSSelectorTypesMatch(): do not
+	read past the end of an unterminated structure type.
+	* Tests/base/NSValue/unterminated-struct-type.m: Test matching of
+	unterminated structure types.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Headers/GNUstepBase/GSIArray.h: Compute buffer sizes in size_t,
 	reject capacities too large for the array and check for overflow
 	when growing.
