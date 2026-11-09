@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSPredicate.m: -[GSFunctionExpression description]: print
+	the arguments separated by commas instead of using the description
+	of the argument array, which grew exponentially with nesting.
+	* Tests/base/NSPredicate/nested-function-format.m: Test formatting
+	of nested function expressions.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: fixBOM(): when byte swapping UTF-16 data of odd
 	length, do not read and write one byte past the end of the buffers;
 	keep the length in an NSUInteger.

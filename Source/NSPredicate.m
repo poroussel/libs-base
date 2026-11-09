@@ -3528,7 +3528,28 @@ do { \
 
       return [NSString stringWithFormat: @"%@ %@ %@", a0, _op, a1];
     }
-  return [NSString stringWithFormat: @"%@(%@)", [self function], _args];
+  else
+    {
+      NSMutableString	*s;
+      NSUInteger	count = [_args count];
+      NSUInteger	i;
+
+      /* Not the description of the _args array: that would quote and
+       * escape the description of each argument again at every level of
+       * nesting, making the result grow exponentially.
+       */
+      s = [NSMutableString stringWithFormat: @"%@(", [self function]];
+      for (i = 0; i < count; i++)
+	{
+	  if (i > 0)
+	    {
+	      [s appendString: @", "];
+	    }
+	  [s appendString: [[_args objectAtIndex: i] description]];
+	}
+      [s appendString: @")"];
+      return s;
+    }
 }
 
 - (NSString *) function
