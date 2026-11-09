@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: Never create a tiny string from more than 8
+	characters; a ninth (nul) character overlapped the length and tag
+	bits and overflowed the buffers used by GSTinyString methods.
+	* Tests/base/NSString/tiny_nine_chars.m: Test nine character
+	strings ending in a nul.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Tests/fuzz/README:
 	* Tests/fuzz/.gitignore:
 	* Tests/fuzz/build.sh:

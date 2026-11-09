@@ -1194,20 +1194,16 @@ createTinyString(const char *str, int length)
       return nil;
     }
 
-  /* String too long to fit in a pointer, give up
+  /* String too long to fit in a pointer, give up.
+   * Only eight 7-bit characters fit; a ninth character (even a nul)
+   * would overlap the length and tag bits and produce a string whose
+   * length is 9 while all the methods assume at most 8 characters.
    */
-  if (length > 9)
+  if (length > 8)
     {
       return nil;
     }
 
-  /* String would fit if the last byte was an implicit 0, but it isn't.
-   */
-  if ((length == 9) && str[8] != '\0')
-    {
-      return nil;
-    }
-  
   s |= length << TINY_STRING_LENGTH_SHIFT;
   for (i = 0 ; i<length ; i++)
     {
