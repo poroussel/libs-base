@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSSerializer.m: Check string and data lengths against the
+	remaining data before allocating, and limit the initial capacity of
+	arrays and dictionaries to the remaining data length.
+	* Tests/base/NSSerializer/huge-counts.m: Test serialized property
+	lists with huge element counts.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSKeyedUnarchiver.m: Raise NSInvalidArgumentException for
 	an archive which is not a dictionary or whose $objects/$top entries
 	have the wrong class, and do not let -dealloc see an uninitialised

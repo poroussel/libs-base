@@ -514,6 +514,36 @@ endDeserializerInfo(_NSDeserializerInfo* info)
     }
 }
 
+/* Raise an exception unless at least 'needed' bytes of data remain.
+ * Counts and lengths come from the (untrusted) data, so they must be
+ * checked before being used to size an allocation.
+ */
+static inline void
+checkAvailable(_NSDeserializerInfo* info, NSUInteger needed)
+{
+  NSUInteger	length = [info->data length];
+
+  if (*info->cursor > length || needed > length - *info->cursor)
+    {
+      [NSException raise: NSRangeException
+		  format: @"serialized property list truncated or corrupt"
+	@" (need %lu bytes at %u of %lu)",
+	(unsigned long)needed, *info->cursor, (unsigned long)length];
+    }
+}
+
+/* The initial capacity to use for a container claiming 'size' elements:
+ * each element needs at least one byte, so never more than that.
+ */
+static inline unsigned
+containerCapacity(_NSDeserializerInfo* info, unsigned size)
+{
+  NSUInteger	length = [info->data length];
+  NSUInteger	left = (*info->cursor < length) ? length - *info->cursor : 0;
+
+  return (size > left) ? (unsigned)left : size;
+}
+
 static id
 deserializeFromInfo(_NSDeserializerInfo* info)
 {
@@ -560,6 +590,7 @@ deserializeFromInfo(_NSDeserializerInfo* info)
 			  format: @"invalid (zero) C string length in"
 	      @" serialized property list"];
 	    }
+	  checkAvailable(info, size);
 	  b = NSZoneMalloc(NSDefaultMallocZone(), size);
 	  (*info->debImp)(info->data, debSel, b, size, info->cursor);
 	  s = [[StringClass alloc] initWithBytesNoCopy: b
@@ -592,6 +623,7 @@ deserializeFromInfo(_NSDeserializerInfo* info)
 	  unichar	*b;
 	
 	  size = (*info->deiImp)(info->data, deiSel, info->cursor);
+	  checkAvailable(info, (NSUInteger)size*sizeof(unichar));
 	  b = NSZoneMalloc(NSDefaultMallocZone(), size*sizeof(unichar));
 	  (*info->debImp)(info->data, debSel, b, size*sizeof(unichar),
 	    info->cursor);
@@ -626,7 +658,7 @@ deserializeFromInfo(_NSDeserializerInfo* info)
 	  id		a;
 
 	  a = NSAllocateObject(MACls, 0, NSDefaultMallocZone());
-	  a = (*maInitImp)(a, maInitSel, size);
+	  a = (*maInitImp)(a, maInitSel, containerCapacity(info, size));
 	  if (a != nil)
 	    {
 	      unsigned	i;
@@ -658,7 +690,7 @@ deserializeFromInfo(_NSDeserializerInfo* info)
 	  id		d;
 
 	  d = NSAllocateObject(MDCls, 0, NSDefaultMallocZone());
-	  d = (*mdInitImp)(d, mdInitSel, size);
+	  d = (*mdInitImp)(d, mdInitSel, containerCapacity(info, size));
 	  if (d != nil)
 	    {
 	      unsigned int	i;
@@ -709,6 +741,7 @@ deserializeFromInfo(_NSDeserializerInfo* info)
 	  NSData	*d;
 
 	  size = (*info->deiImp)(info->data, deiSel, info->cursor);
+	  checkAvailable(info, size);
 	  d = (NSData*)NSAllocateObject(DCls, 0, NSDefaultMallocZone());
 	  if (size > 0)
 	    {
