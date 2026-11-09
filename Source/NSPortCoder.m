@@ -747,6 +747,12 @@ scalarSize(char type)
 			      format: @"class crossref missing - %d", xref];
 		}
 	      classInfo = (GSClassInfo*)GSIArrayItemAtIndex(_clsAry, xref).obj;
+	      if (nil == classInfo)
+		{
+		  /* Entry zero is a placeholder, not a class. */
+		  [NSException raise: NSInternalInconsistencyException
+			      format: @"class crossref invalid - %d", xref];
+		}
 	      *(Class*)address = classInfo->class;
 	      return;
 	    }

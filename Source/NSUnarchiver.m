@@ -996,6 +996,12 @@ scalarSize(char type)
 		}
 	      classInfo = (NSUnarchiverObjectInfo*)
 		GSIArrayItemAtIndex(clsMap, xref).obj;
+	      if (nil == classInfo)
+		{
+		  /* Entry zero is a placeholder, not a class. */
+		  [NSException raise: NSInternalInconsistencyException
+			      format: @"class crossref invalid - %d", xref];
+		}
 	      *(Class*)address = mapClassObject(classInfo);
 	      return;
 	    }

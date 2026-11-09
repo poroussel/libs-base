@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSUnarchiver.m:
+	* Source/NSPortCoder.m: Raise an exception for a class
+	cross-reference to the empty entry zero instead of dereferencing it.
+	* Tests/base/NSArchiver/class-crossref-zero.m: Test a class
+	cross-reference of zero.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/GSStandaloneXMLParser.m: Do not drop the last
 	character of an unquoted attribute value at the end of the input,
 	and report an error for an empty entity instead of reading beyond
