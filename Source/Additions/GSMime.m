@@ -1121,11 +1121,12 @@ wordData(NSString *word, BOOL *encoded)
       beg = 0;
 
       /* Make sure buffer is big enough, and set up output pointers.
-       * ctxt->size is the amount of data laready decoded, so if we
-       * add the size of the chunked source data we are guaranteed
-       * to have enough space for the unchunked data.
+       * size is the amount of data already decoded, so if we add the
+       * size of the chunked source data we are guaranteed to have
+       * enough space for the unchunked data.  Do not use the size
+       * announced in a chunk header: the data may never arrive.
        */
-      [dData setLength: ctxt->size + [sData length]];
+      [dData setLength: size + aRange.length];
       buf = (unsigned char*)[dData mutableBytes];
       dst = buf + size;
       beg = dst;

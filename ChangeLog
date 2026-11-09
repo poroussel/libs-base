@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/GSMime.m: -decodeData:fromRange:intoData:withContext:
+	size the output buffer for chunked data from the data decoded so far
+	and the input, not from the size announced in the chunk header.
+	* Tests/base/GSMime/chunked-size-alloc.m: Test a huge announced
+	chunk size.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/NSPredicate.m: -[GSFunctionExpression description]: print
 	the arguments separated by commas instead of using the description
 	of the argument array, which grew exponentially with nesting.
