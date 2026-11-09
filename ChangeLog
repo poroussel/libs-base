@@ -1,5 +1,17 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSFormat.m: Format floating point numbers in a new function,
+	format_float(), into a fixed size buffer or, when the result is
+	larger, a heap buffer of the size snprintf() reports, instead of a
+	stack array of the width plus precision plus 32 bytes.  Use a fixed
+	size buffer in printf_unknown().  read_int(): raise an exception
+	when a width, precision or position does not fit in an int.  Limit
+	argument positions to GS_FORMAT_MAX_POSITION (4096).
+	* Tests/base/NSString/format-float-buffers.m: Test large numbers,
+	widths, precisions and positions.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Tests/fuzz/fuzz_format.m:
 	* Tests/fuzz/fuzz_scanner.m:
 	* Tests/fuzz/fuzz_decimal.m:

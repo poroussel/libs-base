@@ -396,8 +396,19 @@ read_int (const unichar * *pstr)
 
   while (ISDIGIT (*++(*pstr)))
     {
+      unsigned int	digit = **pstr - '0';
+
+      /* Do not let a width, precision or argument position wrap
+       * around (it would become negative when stored in an int).
+       */
+      if (retval > (INT_MAX - digit) / 10)
+	{
+	  [NSException raise: NSInvalidArgumentException
+		      format: @"width, precision or argument position"
+	    @" in format string is too large"];
+	}
       retval *= 10;
-      retval += **pstr - '0';
+      retval += digit;
     }
 
   return retval;
@@ -806,6 +817,176 @@ static int printf_unknown (GSStr, const struct printf_info *,
 /* Group digits of number string.  */
 static unichar *group_number (unichar *, unichar *, const char *, NSString *);
 
+/* The largest argument position accepted in a format ("%4096$d"): the
+ * tables describing the arguments are allocated on the stack.
+ */
+#define	GS_FORMAT_MAX_POSITION	4096
+
+/* Format a floating point number (%f, %e, %g, %a and their upper case
+ * forms) with the native snprintf(), using the decimal separator of the
+ * locale.
+ */
+static void
+format_float (GSStr s, const struct printf_spec *spec,
+  const union printf_arg *args_value, NSDictionary *locale)
+{
+  char		buf1[64];	// The format for snprintf()
+  char		small[512];	// Usual output buffer
+  char		*buf2 = small;	// Output buffer
+  char		*bp;
+  int		len;
+  unichar	digits[32];
+  unichar	*const digitsend = &digits[32];
+  unichar	*w;
+  NSString	*decimal_sep;
+
+  decimal_sep = [locale objectForKey: NSDecimalSeparator];
+  if (decimal_sep == nil) decimal_sep = @".";
+
+  bp = buf1;
+
+  *bp++ = '%';
+
+  if (spec->info.alt)
+    *bp++ = '#';
+  if (spec->info.group)
+    *bp++ = '\'';
+  if (spec->info.showsign)
+    *bp++ = '+';
+  else if (spec->info.space)
+    *bp++ = ' ';
+  if (spec->info.left)
+    *bp++ = '-';
+  if (spec->info.pad == '0')
+    *bp++ = '0';
+  if (spec->info.i18n)
+    *bp++ = 'I';
+
+  if (spec->info.width != 0)
+    {
+      w = _itowa_word (spec->info.width, digitsend, 10, 0);
+      while (w < digitsend)
+	*bp++ = *w++;
+    }
+
+  if (spec->info.prec != -1)
+    {
+      *bp++ = '.';
+      w = _itowa_word (spec->info.prec, digitsend, 10, 0);
+      while (w < digitsend)
+	*bp++ = *w++;
+    }
+
+  if (spec->info.spec != '\0')
+    *bp++ = spec->info.spec;
+
+  *bp = '\0';
+
+  /* Format into the small buffer, or if the result does not fit (large
+   * width, precision or number) into one of the size snprintf() asks for.
+   */
+  if (spec->info.is_long_double)
+    {
+      len = snprintf(small, sizeof(small), buf1,
+	args_value[spec->data_arg].pa_long_double);
+    }
+  else
+    {
+      len = snprintf(small, sizeof(small), buf1,
+	args_value[spec->data_arg].pa_double);
+    }
+  if (len < 0)
+    {
+      small[0] = '\0';	// Not representable (e.g. too wide)
+    }
+  else if ((size_t)len >= sizeof(small))
+    {
+      buf2 = malloc((size_t)len + 1);
+      if (buf2 == NULL)
+	{
+	  [NSException raise: NSMallocException
+		      format: @"Unable to allocate %lu bytes to format number",
+	    (unsigned long)len + 1];
+	}
+      if (spec->info.is_long_double)
+	{
+	  snprintf(buf2, (size_t)len + 1, buf1,
+	    args_value[spec->data_arg].pa_long_double);
+	}
+      else
+	{
+	  snprintf(buf2, (size_t)len + 1, buf1,
+	    args_value[spec->data_arg].pa_double);
+	}
+    }
+
+  /*
+   * FIXME - hack to rewrite decimal separator into correct locale
+   * if necessary.
+   */
+  if (decimal_sep != nil)
+    {
+      NSString	*sep = locale_sep();
+
+      if ([decimal_sep isEqual: sep] == NO && [sep length] == 1)
+	{
+	  unichar	m = [sep characterAtIndex: 0];
+	  char		*p = &buf2[strlen(buf2)];
+
+	  /*
+	   * Assume that we won't be finding an escape in the string
+	   * so we can use it as a marker.
+	   */
+	  while (p-- > buf2)
+	    {
+	      if (*p == m)
+		{
+		  *p = '\033';
+		  break;
+		}
+	    }
+	}
+    }
+
+  NS_DURING
+    {
+      bp = buf2;
+      while (*bp)
+	{
+	  if (*bp == '\033')
+	    {
+	      int	i = 0;
+	      int	c = [decimal_sep length];
+	      unichar	b[c];
+
+	      [decimal_sep getCharacters: b];
+	      while (i < c)
+		{
+		  outchar(b[i++]);
+		}
+	      bp++;
+	    }
+	  else
+	    {
+	      outchar(*bp++);
+	    }
+	}
+    }
+  NS_HANDLER
+    {
+      if (buf2 != small)
+	{
+	  free(buf2);
+	}
+      [localException raise];
+    }
+  NS_ENDHANDLER
+  if (buf2 != small)
+    {
+      free(buf2);
+    }
+}
+
 
 /* The function itself.  */
 void
@@ -975,6 +1156,13 @@ NSDictionary *locale)
       }
 
     /* Determine the number of arguments the format string consumes.  */
+    if (max_ref_arg > GS_FORMAT_MAX_POSITION)
+      {
+	/* The argument tables below are on the stack.  */
+	[NSException raise: NSInvalidArgumentException
+		    format: @"argument position %lu in format string"
+	  @" is too large", (unsigned long)max_ref_arg];
+      }
     nargs = MAX (nargs, max_ref_arg);
 
     /* Allocate memory for the argument descriptions.  */
@@ -1420,239 +1608,13 @@ NSDictionary *locale)
 	}
 
     LABEL (form_float):
-      {
-	/* Floating-point number.  This is handled by the native sprintf.  */
-	char buf1[32], *bp;
-	char buf2[specs[nspecs_done].info.width
-	  +specs[nspecs_done].info.prec+32];
-	unichar work_buffer[MAX (specs[nspecs_done].info.width,
-	  specs[nspecs_done].info.spec) + 32];
-	unichar *const workend
-	  = &work_buffer[sizeof (work_buffer) / sizeof (unichar)];
-	register unichar *w;
-	NSString	*decimal_sep;
-
-	decimal_sep = [locale objectForKey: NSDecimalSeparator];
-	if (decimal_sep == nil) decimal_sep = @".";
-
-	bp = buf1;
-
-	*bp++ = '%';
-
-	if (specs[nspecs_done].info.alt)
-	  *bp++ = '#';
-	if (specs[nspecs_done].info.group)
-	  *bp++ = '\'';
-	if (specs[nspecs_done].info.showsign)
-	  *bp++ = '+';
-	else if (specs[nspecs_done].info.space)
-	  *bp++ = ' ';
-	if (specs[nspecs_done].info.left)
-	  *bp++ = '-';
-	if (specs[nspecs_done].info.pad == '0')
-	  *bp++ = '0';
-	if (specs[nspecs_done].info.i18n)
-	  *bp++ = 'I';
-
-	if (specs[nspecs_done].info.width != 0)
-	  {
-	    w = _itowa_word (specs[nspecs_done].info.width, workend, 10, 0);
-	    while (w < workend)
-	      *bp++ = *w++;
-	  }
-
-	if (specs[nspecs_done].info.prec != -1)
-	  {
-	    *bp++ = '.';
-	    w = _itowa_word (specs[nspecs_done].info.prec, workend, 10, 0);
-	    while (w < workend)
-	      *bp++ = *w++;
-	  }
-
-	if (specs[nspecs_done].info.spec != '\0')
-	  *bp++ = specs[nspecs_done].info.spec;
-
-	*bp = '\0';
-
-	if (specs[nspecs_done].info.is_long_double)
-	  {
-	    snprintf(buf2, sizeof(buf2), buf1,
-	      args_value[specs[nspecs_done].data_arg].pa_long_double);
-	  }
-	else
-	  {
-	    snprintf(buf2, sizeof(buf2), buf1,
-	      args_value[specs[nspecs_done].data_arg].pa_double);
-	  }
-
-	/*
-	 * FIXME - hack to rewrite decimal separator into correct locale
-	 * if necessary.
-	 */
-	if (decimal_sep != nil)
-	  {
-	    NSString	*sep = locale_sep();
-
-	    if ([decimal_sep isEqual: sep] == NO && [sep length] == 1)
-	      {
-		unichar	m = [sep characterAtIndex: 0];
-		char	*p = &buf2[strlen(buf2)];
-
-		/*
-		 * Assume that we won't be finding an escape in the string
-		 * so we can use it as a marker.
-		 */
-		while (p-- > buf2)
-		  {
-		    if (*p == m)
-		      {
-			*p = '\033';
-			break;
-		      }
-		  }
-	      }
-	  }
-
-	bp = buf2;
-	while (*bp)
-	  {
-	    if (*bp == '\033')
-	      {
-		int	i = 0;
-		int	c = [decimal_sep length];
-		unichar	b[c];
-
-		[decimal_sep getCharacters: b];
-		while (i < c)
-		  {
-		    outchar(b[i++]);
-		  }
-		bp++;
-	      }
-	    else
-	      {
-		outchar(*bp++);
-	      }
-	  }
-      }
+      /* Floating-point number.  This is handled by the native sprintf.  */
+      format_float (s, &specs[nspecs_done], args_value, locale);
       break;
 
     LABEL (form_floathex):
-      {
-	/* Floating point number printed as hexadecimal number.  */
-	char buf1[32], *bp;
-	char buf2[specs[nspecs_done].info.width
-	  +specs[nspecs_done].info.prec+32];
-	unichar work_buffer[MAX (specs[nspecs_done].info.width,
-	  specs[nspecs_done].info.spec) + 32];
-	unichar *const workend
-	  = &work_buffer[sizeof (work_buffer) / sizeof (unichar)];
-	register unichar *w;
-	NSString	*decimal_sep;
-
-	decimal_sep = [locale objectForKey: NSDecimalSeparator];
-	if (decimal_sep == nil) decimal_sep = @".";
-
-	bp = buf1;
-
-	*bp++ = '%';
-
-	if (specs[nspecs_done].info.alt)
-	  *bp++ = '#';
-	if (specs[nspecs_done].info.group)
-	  *bp++ = '\'';
-	if (specs[nspecs_done].info.showsign)
-	  *bp++ = '+';
-	else if (specs[nspecs_done].info.space)
-	  *bp++ = ' ';
-	if (specs[nspecs_done].info.left)
-	  *bp++ = '-';
-	if (specs[nspecs_done].info.pad == '0')
-	  *bp++ = '0';
-	if (specs[nspecs_done].info.i18n)
-	  *bp++ = 'I';
-
-	if (specs[nspecs_done].info.width != 0)
-	  {
-	    w = _itowa_word (specs[nspecs_done].info.width, workend, 10, 0);
-	    while (w < workend)
-	      *bp++ = *w++;
-	  }
-
-	if (specs[nspecs_done].info.prec != -1)
-	  {
-	    *bp++ = '.';
-	    w = _itowa_word (specs[nspecs_done].info.prec, workend, 10, 0);
-	    while (w < workend)
-	      *bp++ = *w++;
-	  }
-
-	if (specs[nspecs_done].info.spec != '\0')
-	  *bp++ = specs[nspecs_done].info.spec;
-
-	*bp = '\0';
-
-	if (specs[nspecs_done].info.is_long_double)
-	  {
-	    snprintf(buf2, sizeof(buf2), buf1,
-	      args_value[specs[nspecs_done].data_arg].pa_long_double);
-	  }
-	else
-	  {
-	    snprintf(buf2, sizeof(buf2), buf1,
-	      args_value[specs[nspecs_done].data_arg].pa_double);
-	  }
-
-	/*
-	 * FIXME - hack to rewrite decimal separator into correct locale
-	 * if necessary.
-	 */
-	if (decimal_sep != nil)
-	  {
-	    NSString	*sep = locale_sep();
-
-	    if ([decimal_sep isEqual: sep] == NO && [sep length] == 1)
-	      {
-		unichar	m = [sep characterAtIndex: 0];
-		char	*p = &buf2[strlen(buf2)];
-
-		/*
-		 * Assume that we won't be finding an escape in the string
-		 * so we can use it as a marker.
-		 */
-		while (p-- > buf2)
-		  {
-		    if (*p == m)
-		      {
-			*p = '\033';
-			break;
-		      }
-		  }
-	      }
-	  }
-
-	bp = buf2;
-	while (*bp)
-	  {
-	    if (*bp == '\033')
-	      {
-		int	i = 0;
-		int	c = [decimal_sep length];
-		unichar	b[c];
-
-		[decimal_sep getCharacters: b];
-		while (i < c)
-		  {
-		    outchar(b[i++]);
-		  }
-		bp++;
-	      }
-	    else
-	      {
-		outchar(*bp++);
-	      }
-	  }
-      }
+      /* Floating point number printed as hexadecimal number.  */
+      format_float (s, &specs[nspecs_done], args_value, locale);
       break;
 
     LABEL (form_pointer):
@@ -1962,7 +1924,7 @@ printf_unknown (GSStr s, const struct printf_info *info,
 
 {
   int done = 0;
-  unichar work_buffer[MAX (info->width, info->spec) + 32];
+  unichar work_buffer[32];	// Only holds the digits of an int
   unichar *const workend
     = &work_buffer[sizeof (work_buffer) / sizeof (unichar)];
   register unichar *w;
