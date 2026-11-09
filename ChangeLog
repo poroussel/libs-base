@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: fixBOM(): when byte swapping UTF-16 data of odd
+	length, do not read and write one byte past the end of the buffers;
+	keep the length in an NSUInteger.
+	* Tests/base/NSString/utf16-odd-length-bom.m: Test odd length UTF-16
+	data with byte order marks.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/Unicode.m: GSFromUnicode(): compute the size of
 	the conversion tables with sizeof() instead of separate constants;
 	the NeXTSTEP one said 128 entries for a table of 121.

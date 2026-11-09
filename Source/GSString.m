@@ -1279,7 +1279,7 @@ fixBOM(unsigned char **bytes, NSUInteger*length, BOOL *owned,
   NSStringEncoding encoding)
 {
   unsigned char	*b = *bytes;
-  unsigned	len = *length;
+  NSUInteger	len = *length;
 
   if (encoding == NSUnicodeStringEncoding && *length >= 2
     && ((b[0] == 0xFE && b[1] == 0xFF) || (b[0] == 0xFF && b[1] == 0xFE)))
@@ -1313,12 +1313,19 @@ fixBOM(unsigned char **bytes, NSUInteger*length, BOOL *owned,
 	    }
 	  else
 	    {
-	      unsigned	i;
+	      NSUInteger	i;
 
-	      for (i = 0; i < len; i += 2)
+	      /* Swap complete code units only.  A trailing odd byte is
+	       * copied unchanged (and ignored by the conversion).
+	       */
+	      for (i = 0; i + 1 < len; i += 2)
 		{
 		  to[i] = from[i+1];
 		  to[i+1] = from[i];
+		}
+	      if (i < len)
+		{
+		  to[i] = from[i];
 		}
 	    }
 	  if (*owned == YES)
