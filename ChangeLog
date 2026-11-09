@@ -1,5 +1,14 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSKeyedUnarchiver.m: Raise NSInvalidArgumentException for
+	an archive which is not a dictionary or whose $objects/$top entries
+	have the wrong class, and do not let -dealloc see an uninitialised
+	object map.
+	* Tests/base/NSKeyedArchiver/malformed-root.m: Test archives with a
+	malformed structure.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/Additions/GSObjCRuntime.m: GSSelectorTypesMatch(): do not
 	read past the end of an unterminated structure type.
 	* Tests/base/NSValue/unterminated-struct-type.m: Test matching of

@@ -1075,14 +1075,34 @@ GSNSErrorFromUnarchiverException(NSException *exception)
 
 	  IF_NO_ARC(RETAIN(_archive);)
 	  NS_DURING
+	  if ([_archive isKindOfClass: [NSDictionary class]] == NO)
+	    {
+	      [NSException raise: NSInvalidArgumentException
+			  format: @"[%@ -%@]: archive is not a dictionary",
+		NSStringFromClass([self class]), NSStringFromSelector(_cmd)];
+	    }
 	  _archiverClass = [_archive objectForKey: @"$archiver"];
 	  _version = [_archive objectForKey: @"$version"];
 
 	  _objects = [_archive objectForKey: @"$objects"];
 	  _keyMap = [_archive objectForKey: @"$top"];
-	  _objMap = NSZoneMalloc(_zone, sizeof(GSIArray_t));
+	  if ([_objects isKindOfClass: [NSArray class]] == NO
+	    || [_keyMap isKindOfClass: [NSDictionary class]] == NO)
+	    {
+	      [NSException raise: NSInvalidArgumentException
+			  format: @"[%@ -%@]: archive has bad $objects or $top",
+		NSStringFromClass([self class]), NSStringFromSelector(_cmd)];
+	    }
 	  count = [_objects count];
-	  GSIArrayInitWithZoneAndCapacity(_objMap, _zone, count);
+	  /* Only store the map in the ivar once it is initialised, as
+	   * -dealloc empties it.
+	   */
+	  {
+	    GSIArray	m = NSZoneMalloc(_zone, sizeof(GSIArray_t));
+
+	    GSIArrayInitWithZoneAndCapacity(m, _zone, count);
+	    _objMap = m;
+	  }
 	  // Add marker for nil object
 	  GSIArrayAddItem(_objMap, (GSIArrayItem)((id)[NilMarker class]));
 	  // Add markers for unencoded objects.
