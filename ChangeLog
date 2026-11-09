@@ -1,5 +1,13 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/NSScanner.m: -scanDouble: count the mantissa digits beyond
+	the 19 kept, so that long numbers keep their magnitude, and stop
+	accumulating the exponent before it can overflow.
+	* Tests/base/NSScanner/scanDouble-range.m: Test long mantissas and
+	exponents.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSFormat.m: Format floating point numbers in a new function,
 	format_float(), into a fixed size buffer or, when the result is
 	larger, a heap buffer of the size snprintf() reports, instead of a

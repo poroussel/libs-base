@@ -957,6 +957,7 @@ typedef GSString	*ivars;
   BOOL          negativeExponent = NO;
   unsigned      shift = 0;
   int           mantissaLength;
+  int           digits = 0;	// Significant digits, including ignored ones
   int           dotPos = -1;
   int           hi = 0;
   int           lo = 0;
@@ -1012,7 +1013,7 @@ typedef GSString	*ivars;
 	  if (_decimal == c
 	    || (_decimal > 127 && _decimal == myCharacter(_scanLocation)))
 	    {
-	      dotPos = mantissaLength;
+	      dotPos = digits;
 	    }
 	  else
 	    {
@@ -1022,16 +1023,27 @@ typedef GSString	*ivars;
       else
         {
 	  mantissaDigit = YES;
-	  if (0 == mantissaLength && '0' == c)
+	  if (0 == digits && '0' == c)
 	    {
 	      if (dotPos >= 0)
 		{
 		  shift++;	// Leading zero after decimal place
 		}
 	    }
-	  else if (mantissaLength < 19)
+	  else
 	    {
-	      mantissa[mantissaLength++] = c;
+	      /* Count every significant digit (so that digits ignored
+	       * before the decimal point still scale the result), but
+	       * only keep the ones a double can use.
+	       */
+	      if (digits < INT_MAX)
+		{
+		  digits++;
+		}
+	      if (mantissaLength < 19)
+		{
+		  mantissa[mantissaLength++] = c;
+		}
 	    }
         }
     }
@@ -1048,7 +1060,7 @@ typedef GSString	*ivars;
     }
   if (dotPos < 0)
     {
-      dotPos = mantissaLength;
+      dotPos = digits;
     }
   dotPos -= mantissaLength;
  
@@ -1104,7 +1116,13 @@ typedef GSString	*ivars;
 	      while (_scanLocation < myLength()
 		&& (c = mySevenBit(_scanLocation)) >= '0' && c <= '9')
 		{
-		  exponent = exponent * 10 + (c - '0');
+		  /* Stop accumulating (but keep scanning digits) once the
+		   * exponent is far out of range, so it cannot overflow.
+		   */
+		  if (exponent < 100000000)
+		    {
+		      exponent = exponent * 10 + (c - '0');
+		    }
 		  _scanLocation++;
 		}
 	    }
