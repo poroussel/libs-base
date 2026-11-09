@@ -1037,6 +1037,7 @@ GSToUnicode(unichar **dst, unsigned int *size, const unsigned char *src,
   unsigned	extra = (options & GSUniTerminate) ? sizeof(unichar) : 0;
   unichar	base = 0;
   unichar	*table = 0;
+  unsigned	tsize = 0;	/* Number of entries in table */
   BOOL		result = YES;
 #ifdef HAVE_ICONV
   iconv_t	cd = (iconv_t)-1;
@@ -1564,36 +1565,59 @@ GSToUnicode(unichar **dst, unsigned int *size, const unsigned char *src,
       case NSNEXTSTEPStringEncoding:
 	base = Next_conv_base;
 	table = Next_char_to_uni_table;
+	tsize = sizeof(Next_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 
       case NSISOCyrillicStringEncoding:
 	base = Cyrillic_conv_base;
 	table = Cyrillic_char_to_uni_table;
+	tsize = sizeof(Cyrillic_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 
       case NSISOLatin2StringEncoding:
 	base = Latin2_conv_base;
 	table = Latin2_char_to_uni_table;
+	tsize = sizeof(Latin2_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 
       case NSISOLatin9StringEncoding:
 	base = Latin9_conv_base;
 	table = Latin9_char_to_uni_table;
+	tsize = sizeof(Latin9_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 
       case NSISOThaiStringEncoding:
         base = Thai_conv_base;
 	table = Thai_char_to_uni_table;
+	tsize = sizeof(Thai_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 	
 #if 0
       case NSSymbolStringEncoding:
 	base = Symbol_conv_base;
 	table = Symbol_char_to_uni_table;
+	tsize = sizeof(Symbol_char_to_uni_table) / sizeof(unichar);
 	goto tables;
 #endif
 
 tables:
+	/* Bytes beyond the end of the table are not part of the character
+	 * set (eg 0xfe and 0xff in NeXTSTEP), so they can't be converted.
+	 */
+	{
+	  unsigned	i;
+
+	  for (i = spos; i < slen; i++)
+	    {
+	      unc c = (unc)src[i];
+
+	      if (c >= base && (unsigned)(c - base) >= tsize)
+		{
+		  result = NO;
+		  goto done;
+		}
+	    }
+	}
 	if (dst == 0)
 	  {
 	    /* Just counting bytes, and we know there is exactly one
@@ -1659,12 +1683,17 @@ tables:
 	  {
 	    unc c = (unc)src[spos];
 
+	    if (c >= sizeof(GSM0338_char_to_uni_table) / sizeof(unichar))
+	      {
+		result = NO;	// GSM 03.38 is a 7-bit character set
+		goto done;
+	      }
 	    if (dpos >= bsize)
 	      {
 		GROW();
 	      }
 	    ptr[dpos] = GSM0338_char_to_uni_table[c];
-	    if (c == 0x1b && spos < slen + 1)
+	    if (c == 0x1b && spos + 1 < slen)
 	      {
 		unsigned	i = 0;
 

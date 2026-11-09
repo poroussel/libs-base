@@ -1,5 +1,14 @@
 2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/Additions/Unicode.m: GSToUnicode(): fail for bytes beyond
+	the end of the NeXTSTEP (0xfe, 0xff) and other conversion tables
+	instead of reading past them, reject GSM 03.38 bytes above 0x7f, and
+	do not read past the input after a trailing GSM 03.38 escape.
+	* Tests/base/NSString/table-encodings-bounds.m: Test conversion of
+	bytes outside the table based character sets.
+
+2026-11-09 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSPrivate.h:
 	* Source/NSCoder.m: Add GSPrivateCoderCanHold() to check a count
 	read from an archive against the data remaining in the coder.
