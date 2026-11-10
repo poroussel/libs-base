@@ -1629,7 +1629,7 @@ failure:
 	  unsigned	count = atoi(++type);
 	  unsigned	i;
 
-	  while (isdigit(*type))
+	  while (isdigit(*(uint8_t*)type))
 	    {
 	      type++;
 	    }
@@ -3128,7 +3128,7 @@ failure:
 	  unsigned	count = atoi(++type);
 	  unsigned	i;
 
-	  while (isdigit(*type))
+	  while (isdigit(*(uint8_t*)type))
 	    {
 	      type++;
 	    }
@@ -3584,7 +3584,7 @@ getBytes(void* dst, void* src, unsigned len, unsigned limit, unsigned *pos)
 	  unsigned	count = atoi(++type);
 	  unsigned	i;
 
-	  while (isdigit(*type))
+	  while (isdigit(*(uint8_t*)type))
 	    {
 	      type++;
 	    }
@@ -4581,7 +4581,7 @@ getBytes(void* dst, void* src, unsigned len, unsigned limit, unsigned *pos)
 	  unsigned	i;
 	  uint32_t	minimum;
 
-	  while (isdigit(*type))
+	  while (isdigit(*(uint8_t*)type))
 	    {
 	      type++;
 	    }
