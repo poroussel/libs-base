@@ -2626,20 +2626,34 @@ getCStringE_c(GSStr self, char *buffer, unsigned int maxLength,
     {
       if (maxLength >= sizeof(unichar))
 	{
-	  unsigned	bytes = maxLength - sizeof(unichar);
+	  /* GSToUnicode() measures the buffer in characters (not bytes).
+	   * The internal encoding has one character per byte, so we know
+	   * in advance whether the string and its terminator fit, and can
+	   * pass the whole buffer size (some conversions count the
+	   * terminator in it, while others place it beyond the characters
+	   * converted, which is safe as we have checked there is room).
+	   */
+	  unsigned	chars = maxLength / sizeof(unichar);
 	  unichar	*u = (unichar*)(void*)buffer;
 
-	  if (GSToUnicode(&u, &bytes, self->_contents.c, self->_count,
-	    internalEncoding, NSDefaultMallocZone(), GSUniTerminate) == NO)
+	  if (self->_count >= chars)
+	    {
+	      return NO;
+	    }
+	  if (0 == self->_count)
+	    {
+	      memset(buffer, 0, sizeof(unichar));
+	      return YES;
+	    }
+	  /* No zone, so the conversion fails rather than allocating memory.
+	   */
+	  if (GSToUnicode(&u, &chars, self->_contents.c, self->_count,
+	    internalEncoding, 0, GSUniTerminate) == NO)
 	    {
 	      [NSException raise: NSCharacterConversionException
 			  format: @"Can't convert to Unicode string."];
 	    }
-	  if (u == (unichar*)(void*)buffer)
-	    {
-	      return YES;
-	    }
-	  NSZoneFree(NSDefaultMallocZone(), u);
+	  return YES;
 	}
       return NO;
     }

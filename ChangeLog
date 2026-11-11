@@ -1,3 +1,12 @@
+2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
+
+	* Source/GSString.m: getCStringE_c(): for NSUnicodeStringEncoding,
+	give GSToUnicode() the buffer size in characters rather than bytes,
+	so that it no longer writes up to twice maxLength bytes, and return
+	YES when the string fits.
+	* Tests/base/NSString/getcstring-unicode-narrow.m: Test converting
+	8-bit strings to UTF-16 into a buffer.
+
 2026-11-15 Richard Frith-Macdonald <rfm@gnu.org>
 
 	* Tools/autogsdoc.m:
