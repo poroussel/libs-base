@@ -1,5 +1,15 @@
 2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: Add directChars() and replaceDirect().
+	-[GSMutableString replaceCharactersInRange:withString:] and
+	-setString: copy the characters of literal and tiny strings
+	directly instead of checking and converting them through the
+	generic NSString methods.
+	* Tests/base/NSMutableString/literal-edits.m: Test editing mutable
+	strings with literal and tiny strings.
+
+2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: getCStringE_u(): for NSUnicodeStringEncoding,
 	copy whole characters only, so that an odd maxLength no longer reads
 	a byte past the characters and returns a garbage character; return

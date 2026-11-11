@@ -3531,6 +3531,151 @@ transmute(GSStr self, NSString *aString)
   return other;
 }
 
+/* The characters of a constant (literal) string or a tiny string, which
+ * are not GSString subclasses but whose characters we can reach without
+ * sending messages.  Exactly one of 'c' (7-bit ASCII bytes, which are the
+ * same in the internal encoding) and 'u' (UTF-16 code units) is set.
+ */
+typedef struct {
+  const unsigned char	*c;
+  const unichar		*u;
+  unsigned		count;
+} GSDirectChars;
+
+/* If aString is a tiny string or a constant string in a known encoding,
+ * describe its characters in *d and return YES.  The characters of a tiny
+ * string are copied to 'tiny', which must have room for 8 bytes.
+ */
+static inline BOOL
+directChars(NSString *aString, GSDirectChars *d, unsigned char *tiny)
+{
+  uintptr_t	s = (uintptr_t)aString;
+
+#if defined(OBJC_SMALL_OBJECT_SHIFT) && (OBJC_SMALL_OBJECT_SHIFT == 3)
+  if (useTinyStrings
+    && (s & ((1 << OBJC_SMALL_OBJECT_SHIFT) - 1)) == TINY_STRING_MASK)
+    {
+      unsigned	i;
+
+      d->count = (s >> TINY_STRING_LENGTH_SHIFT) & TINY_STRING_LENGTH_MASK;
+      for (i = 0; i < d->count; i++)
+	{
+	  tiny[i] = (unsigned char)TINY_STRING_CHAR(s, i);
+	}
+      d->c = tiny;
+      d->u = 0;
+      return YES;
+    }
+#endif
+#ifdef GNUSTEP_NEW_STRING_ABI
+#  ifdef OBJC_SMALL_OBJECT_MASK
+  if (s & OBJC_SMALL_OBJECT_MASK)
+    {
+      return NO;	// Some other small object
+    }
+#  endif
+  /* This is called for every string appended, so we read the class
+   * pointer directly: object_getClass() is a function call, and a
+   * constant string never has a hidden class (if it did, we would just
+   * take the slower path).
+   */
+  if (*(Class*)(void*)aString == NSConstantStringClass)
+    {
+      NXConstantString	*k = (NXConstantString*)aString;
+
+      switch (k->flags & 3)
+	{
+	  case 0:	// ASCII
+	    d->c = (const unsigned char*)k->nxcsptr;
+	    d->u = 0;
+	    d->count = k->nxcslen;
+	    return YES;
+	  case 2:	// UTF-16
+	    d->c = 0;
+	    d->u = (const unichar*)(void*)k->nxcsptr;
+	    d->count = k->nxcslen;
+	    return YES;
+	}
+    }
+#endif
+  return NO;
+}
+
+/* Replace the characters in aRange of the mutable string self with those
+ * described by d, widening self first if they will not fit in the
+ * internal 8-bit encoding.
+ */
+static void
+replaceDirect(GSStr self, NSRange aRange, const GSDirectChars *d)
+{
+  unsigned	length = d->count;
+  unsigned	i;
+
+  if (0 == self->_flags.wide && d->u != 0)
+    {
+      /* ASCII characters are the same in any internal encoding, the
+       * first 256 characters only if that encoding is latin1.
+       */
+      unichar	limit = 127;
+
+      if (NSISOLatin1StringEncoding == internalEncoding)
+	{
+	  limit = 255;
+	}
+      for (i = 0; i < length; i++)
+	{
+	  if (d->u[i] > limit)
+	    {
+	      GSStrWiden(self);
+	      break;
+	    }
+	}
+    }
+
+  if (length > aRange.length)
+    {
+      makeHole(self, NSMaxRange(aRange), length - aRange.length);
+    }
+  else if (length < aRange.length)
+    {
+      fillHole(self, aRange.location + length, aRange.length - length);
+    }
+
+  if (1 == self->_flags.wide)
+    {
+      unichar	*dst = self->_contents.u + aRange.location;
+
+      if (d->u != 0)
+	{
+	  memcpy(dst, d->u, length * sizeof(unichar));
+	}
+      else
+	{
+	  for (i = 0; i < length; i++)
+	    {
+	      dst[i] = d->c[i];
+	    }
+	}
+    }
+  else
+    {
+      unsigned char	*dst = self->_contents.c + aRange.location;
+
+      if (d->c != 0)
+	{
+	  memcpy(dst, d->c, length);
+	}
+      else
+	{
+	  for (i = 0; i < length; i++)
+	    {
+	      dst[i] = (unsigned char)d->u[i];
+	    }
+	}
+    }
+  self->_flags.hash = 0;
+}
+
 
 
 /*
@@ -5163,8 +5308,18 @@ NSAssert(_flags.owned == 1 && _zone != 0, NSInternalInconsistencyException);
 		       withString: (NSString*)aString
 {
   unsigned	length = 0;
+  GSDirectChars	d;
+  unsigned char	tiny[8];
 
   GS_RANGE_CHECK(aRange, _count);
+  if (aString != nil && directChars(aString, &d, tiny))
+    {
+      /* A literal or tiny string: copy its characters directly rather
+       * than asking it whether and how they convert.
+       */
+      replaceDirect((GSStr)self, aRange, &d);
+      return;
+    }
   if (aString != nil)
     {
       if (GSObjCIsInstance(aString) == NO)
@@ -5296,9 +5451,17 @@ NSAssert(_flags.owned == 1 && _zone != 0, NSInternalInconsistencyException);
 
 - (void) setString: (NSString*)aString
 {
-  unsigned int	len = (aString == nil) ? 0 : [aString length];
-  GSStr	other;
+  unsigned int	len;
+  GSStr		other;
+  GSDirectChars	d;
+  unsigned char	tiny[8];
 
+  if (aString != nil && directChars(aString, &d, tiny))
+    {
+      replaceDirect((GSStr)self, NSMakeRange(0, _count), &d);
+      return;
+    }
+  len = (aString == nil) ? 0 : [aString length];
   if (len == 0)
     {
       _count = 0;
