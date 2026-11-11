@@ -1272,6 +1272,76 @@ createTinyString(const char *str, int length)
   return nil;
 }
 #endif
+/* The characters of a constant (literal) string or a tiny string, which
+ * are not GSString subclasses but whose characters we can reach without
+ * sending messages.  Exactly one of 'c' (7-bit ASCII bytes, which are the
+ * same in the internal encoding) and 'u' (UTF-16 code units) is set.
+ */
+typedef struct {
+  const unsigned char	*c;
+  const unichar		*u;
+  unsigned		count;
+} GSDirectChars;
+
+/* If aString is a tiny string or a constant string in a known encoding,
+ * describe its characters in *d and return YES.  The characters of a tiny
+ * string are copied to 'tiny', which must have room for 8 bytes.
+ */
+static inline BOOL
+directChars(NSString *aString, GSDirectChars *d, unsigned char *tiny)
+{
+  uintptr_t	s = (uintptr_t)aString;
+
+#if defined(OBJC_SMALL_OBJECT_SHIFT) && (OBJC_SMALL_OBJECT_SHIFT == 3)
+  if (useTinyStrings
+    && (s & ((1 << OBJC_SMALL_OBJECT_SHIFT) - 1)) == TINY_STRING_MASK)
+    {
+      unsigned	i;
+
+      d->count = (s >> TINY_STRING_LENGTH_SHIFT) & TINY_STRING_LENGTH_MASK;
+      for (i = 0; i < d->count; i++)
+	{
+	  tiny[i] = (unsigned char)TINY_STRING_CHAR(s, i);
+	}
+      d->c = tiny;
+      d->u = 0;
+      return YES;
+    }
+#endif
+#ifdef GNUSTEP_NEW_STRING_ABI
+#  ifdef OBJC_SMALL_OBJECT_MASK
+  if (s & OBJC_SMALL_OBJECT_MASK)
+    {
+      return NO;	// Some other small object
+    }
+#  endif
+  /* This is called for every string appended, so we read the class
+   * pointer directly: object_getClass() is a function call, and a
+   * constant string never has a hidden class (if it did, we would just
+   * take the slower path).
+   */
+  if (*(Class*)(void*)aString == NSConstantStringClass)
+    {
+      NXConstantString	*k = (NXConstantString*)aString;
+
+      switch (k->flags & 3)
+	{
+	  case 0:	// ASCII
+	    d->c = (const unsigned char*)k->nxcsptr;
+	    d->u = 0;
+	    d->count = k->nxcslen;
+	    return YES;
+	  case 2:	// UTF-16
+	    d->c = 0;
+	    d->u = (const unichar*)(void*)k->nxcsptr;
+	    d->count = k->nxcslen;
+	    return YES;
+	}
+    }
+#endif
+  return NO;
+}
+
 /*
  * The GSPlaceholderString class is used by the abstract cluster root
  * class to provide temporary objects that will be replaced as soon
@@ -1733,9 +1803,64 @@ fixBOM(unsigned char **bytes, NSUInteger*length, BOOL *owned,
   Class		c;
   GSStr		me;
 
+  GSDirectChars	d;
+  unsigned char	tiny[8];
+
   if (string == nil)
     [NSException raise: NSInvalidArgumentException
 		format: @"GSPlaceholderString-initWithString: given nil string"];
+  /* For a literal or tiny string, copy the characters directly.
+   * NB. This method must always return one of our concrete string classes
+   * (never a tiny string or a literal) because other code (NSScanner)
+   * uses it to get a string whose instance variables it can access.
+   */
+  if (directChars(string, &d, tiny))
+    {
+      unsigned	i;
+
+      if (d.c != 0)
+	{
+	  /* ASCII is a subset of the internal encoding.
+	   */
+	  me = (GSStr)newCInline(d.count, myZone);
+	  memcpy(me->_contents.c, d.c, d.count);
+	  return (id)me;
+	}
+      else
+	{
+	  /* Keep UTF-16 characters in the internal 8-bit encoding if they
+	   * fit (as -initWithBytes:length:encoding: does), so that the copy
+	   * is smaller and faster to use.
+	   */
+	  unichar	limit = 127;
+
+	  if (NSISOLatin1StringEncoding == internalEncoding)
+	    {
+	      limit = 255;
+	    }
+	  for (i = 0; i < d.count; i++)
+	    {
+	      if (d.u[i] > limit)
+		{
+		  break;
+		}
+	    }
+	  if (i == d.count)
+	    {
+	      me = (GSStr)newCInline(d.count, myZone);
+	      for (i = 0; i < d.count; i++)
+		{
+		  me->_contents.c[i] = (unsigned char)d.u[i];
+		}
+	    }
+	  else
+	    {
+	      me = (GSStr)newUInline(d.count, myZone);
+	      memcpy(me->_contents.u, d.u, d.count * sizeof(unichar));
+	    }
+	  return (id)me;
+	}
+    }
   if (NO == [string isKindOfClass: NSStringClass])	// may be proxy
     [NSException raise: NSInvalidArgumentException
 		format: @"-initWithString: given non-string object"];
@@ -3630,76 +3755,6 @@ transmute(GSStr self, NSString *aString)
     }
 
   return other;
-}
-
-/* The characters of a constant (literal) string or a tiny string, which
- * are not GSString subclasses but whose characters we can reach without
- * sending messages.  Exactly one of 'c' (7-bit ASCII bytes, which are the
- * same in the internal encoding) and 'u' (UTF-16 code units) is set.
- */
-typedef struct {
-  const unsigned char	*c;
-  const unichar		*u;
-  unsigned		count;
-} GSDirectChars;
-
-/* If aString is a tiny string or a constant string in a known encoding,
- * describe its characters in *d and return YES.  The characters of a tiny
- * string are copied to 'tiny', which must have room for 8 bytes.
- */
-static inline BOOL
-directChars(NSString *aString, GSDirectChars *d, unsigned char *tiny)
-{
-  uintptr_t	s = (uintptr_t)aString;
-
-#if defined(OBJC_SMALL_OBJECT_SHIFT) && (OBJC_SMALL_OBJECT_SHIFT == 3)
-  if (useTinyStrings
-    && (s & ((1 << OBJC_SMALL_OBJECT_SHIFT) - 1)) == TINY_STRING_MASK)
-    {
-      unsigned	i;
-
-      d->count = (s >> TINY_STRING_LENGTH_SHIFT) & TINY_STRING_LENGTH_MASK;
-      for (i = 0; i < d->count; i++)
-	{
-	  tiny[i] = (unsigned char)TINY_STRING_CHAR(s, i);
-	}
-      d->c = tiny;
-      d->u = 0;
-      return YES;
-    }
-#endif
-#ifdef GNUSTEP_NEW_STRING_ABI
-#  ifdef OBJC_SMALL_OBJECT_MASK
-  if (s & OBJC_SMALL_OBJECT_MASK)
-    {
-      return NO;	// Some other small object
-    }
-#  endif
-  /* This is called for every string appended, so we read the class
-   * pointer directly: object_getClass() is a function call, and a
-   * constant string never has a hidden class (if it did, we would just
-   * take the slower path).
-   */
-  if (*(Class*)(void*)aString == NSConstantStringClass)
-    {
-      NXConstantString	*k = (NXConstantString*)aString;
-
-      switch (k->flags & 3)
-	{
-	  case 0:	// ASCII
-	    d->c = (const unsigned char*)k->nxcsptr;
-	    d->u = 0;
-	    d->count = k->nxcslen;
-	    return YES;
-	  case 2:	// UTF-16
-	    d->c = 0;
-	    d->u = (const unichar*)(void*)k->nxcsptr;
-	    d->count = k->nxcslen;
-	    return YES;
-	}
-    }
-#endif
-  return NO;
 }
 
 /* Replace the characters in aRange of the mutable string self with those

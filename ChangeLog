@@ -1,5 +1,13 @@
 2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: -[GSPlaceholderString initWithString:]: copy
+	the characters of literal and tiny strings directly, into 8-bit
+	storage when they fit; move directChars() before it.
+	* Tests/base/NSString/initWithString-literals.m: Test copying
+	literal and tiny strings with -initWithString:.
+
+2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: literalIsEqualInternal(): compare ASCII and
 	UTF-16 constant strings with our strings directly (new string ABI).
 	isEqual_c(), isEqual_u(): compare tiny strings directly
