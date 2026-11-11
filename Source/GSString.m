@@ -2782,20 +2782,29 @@ static inline BOOL
 getCStringE_u(GSStr self, char *buffer, unsigned int maxLength,
   NSStringEncoding enc)
 {
+  if (buffer == 0)
+    {
+      return NO;	// Can't fit in here
+    }
   if (enc == NSUnicodeStringEncoding)
     {
       if (maxLength >= sizeof(unichar))
 	{
-	  unsigned	bytes = maxLength - sizeof(unichar);
+	  /* Copy whole characters only: with an odd maxLength the last
+	   * byte of the buffer is not used.
+	   */
+	  unsigned	chars = maxLength / sizeof(unichar) - 1;
+	  unsigned	bytes;
 
-	  if (bytes/sizeof(unichar) > self->_count)
+	  if (chars > self->_count)
 	    {
-	      bytes = self->_count * sizeof(unichar);
+	      chars = self->_count;
 	    }
+	  bytes = chars * sizeof(unichar);
 	  memcpy(buffer, self->_contents.u, bytes);
 	  buffer[bytes] = '\0';
 	  buffer[bytes + 1] = '\0';
-	  if (bytes/sizeof(unichar) == self->_count)
+	  if (chars == self->_count)
 	    {
 	      return YES;
 	    }

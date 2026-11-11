@@ -1,5 +1,14 @@
 2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: getCStringE_u(): for NSUnicodeStringEncoding,
+	copy whole characters only, so that an odd maxLength no longer reads
+	a byte past the characters and returns a garbage character; return
+	NO for a NULL buffer as getCStringE_c() does.
+	* Tests/base/NSString/getcstring-unicode-odd-length.m: Test copying
+	UTF-16 strings into buffers of odd sizes.
+
+2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: getCStringE_c(): for NSUnicodeStringEncoding,
 	give GSToUnicode() the buffer size in characters rather than bytes,
 	so that it no longer writes up to twice maxLength bytes, and return
