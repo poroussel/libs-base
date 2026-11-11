@@ -1,5 +1,16 @@
 2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: literalIsEqualInternal(): compare ASCII and
+	UTF-16 constant strings with our strings directly (new string ABI).
+	isEqual_c(), isEqual_u(): compare tiny strings directly
+	(tinyEqualGSStr()).  NXConstantString: add -isEqual: and
+	-isEqualToString: for the new string ABI (constantIsEqual()), which
+	compare with tiny, constant and concrete strings directly.
+	* Tests/base/NSString/literal-equality.m: Test comparing literal and
+	tiny strings with every kind of string.
+
+2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: Add directChars() and replaceDirect().
 	-[GSMutableString replaceCharactersInRange:withString:] and
 	-setString: copy the characters of literal and tiny strings

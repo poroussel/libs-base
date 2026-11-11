@@ -305,7 +305,55 @@ literalIsEqualInternal(NXConstantString *s, GSStr o)
     {
       return NO;
     }
-  else
+  switch (s->flags & 3)
+    {
+      case 0:	// ASCII
+	if (0 == o->_flags.wide)
+	  {
+	    /* ASCII is a subset of the internal encoding, so the strings
+	     * are equal only if the bytes are.
+	     */
+	    return (memcmp(o->_contents.c, s->nxcsptr, s->nxcslen) == 0)
+	      ? YES : NO;
+	  }
+	else
+	  {
+	    const unsigned char	*c = (const unsigned char*)s->nxcsptr;
+	    const unichar	*u = o->_contents.u;
+	    unsigned		i;
+
+	    for (i = 0; i < s->nxcslen; i++)
+	      {
+		if (u[i] != c[i])
+		  {
+		    return NO;
+		  }
+	      }
+	    return YES;
+	  }
+      case 2:	// UTF-16
+	if (1 == o->_flags.wide)
+	  {
+	    return (memcmp(o->_contents.u, s->nxcsptr,
+	      s->nxcslen * sizeof(unichar)) == 0) ? YES : NO;
+	  }
+	else if (NSISOLatin1StringEncoding == internalEncoding)
+	  {
+	    const unichar	*u = (const unichar*)(void*)s->nxcsptr;
+	    const unsigned char	*c = o->_contents.c;
+	    unsigned		i;
+
+	    for (i = 0; i < s->nxcslen; i++)
+	      {
+		if (u[i] != c[i])
+		  {
+		    return NO;
+		  }
+	      }
+	    return YES;
+	  }
+	break;
+    }
     {
       size_t end = s->nxcslen;
       static const int buffer_size = 64;
@@ -2885,6 +2933,47 @@ getCStringE_u(GSStr self, char *buffer, unsigned int maxLength,
     }
 }
 
+#if defined(OBJC_SMALL_OBJECT_SHIFT) && (OBJC_SMALL_OBJECT_SHIFT == 3)
+/* Compare a tiny string with one of our concrete strings without sending
+ * messages (tiny strings are ASCII, which is a subset of the internal
+ * encoding).
+ */
+static inline BOOL
+tinyEqualGSStr(uintptr_t s, GSStr o)
+{
+  unsigned	l = (s >> TINY_STRING_LENGTH_SHIFT) & TINY_STRING_LENGTH_MASK;
+  unsigned	i;
+
+  if (o->_count != l)
+    {
+      return NO;
+    }
+  if (1 == o->_flags.wide)
+    {
+      for (i = 0; i < l; i++)
+	{
+	  if (o->_contents.u[i] != (unichar)TINY_STRING_CHAR(s, i))
+	    {
+	      return NO;
+	    }
+	}
+    }
+  else
+    {
+      for (i = 0; i < l; i++)
+	{
+	  if (o->_contents.c[i] != (unsigned char)TINY_STRING_CHAR(s, i))
+	    {
+	      return NO;
+	    }
+	}
+    }
+  return YES;
+}
+#  define IS_TINY_STRING(o)	(useTinyStrings && ((uintptr_t)(o) \
+  & ((1 << OBJC_SMALL_OBJECT_SHIFT) - 1)) == TINY_STRING_MASK)
+#endif
+
 static inline BOOL
 isEqual_c(GSStr self, id anObject)
 {
@@ -2898,6 +2987,12 @@ isEqual_c(GSStr self, id anObject)
     {
       return NO;
     }
+#ifdef IS_TINY_STRING
+  if (IS_TINY_STRING(anObject))
+    {
+      return tinyEqualGSStr((uintptr_t)anObject, self);
+    }
+#endif
   c = object_getClass(anObject);
   if (class_isMetaClass(c) == YES)
     {
@@ -2970,6 +3065,12 @@ isEqual_u(GSStr self, id anObject)
     {
       return NO;
     }
+#ifdef IS_TINY_STRING
+  if (IS_TINY_STRING(anObject))
+    {
+      return tinyEqualGSStr((uintptr_t)anObject, self);
+    }
+#endif
   c = object_getClass(anObject);
   if (class_isMetaClass(c) == YES)
     {
@@ -5760,6 +5861,89 @@ literalIsEqual(NXConstantString *self, id anObject)
 #endif
 
 #ifdef GNUSTEP_NEW_STRING_ABI
+/* Compare a constant string with another object without the generic
+ * NSString code where we can.  Returns 1 if they are equal, 0 if not, and
+ * -1 if the generic code must decide.
+ */
+static int
+constantIsEqual(NXConstantString *self, id anObject)
+{
+  Class	c;
+
+  if (anObject == (id)self)
+    {
+      return 1;
+    }
+  if (anObject == nil)
+    {
+      return 0;
+    }
+#ifdef IS_TINY_STRING
+  if (IS_TINY_STRING(anObject))
+    {
+      return tinyEqualToString((uintptr_t)anObject, (NSString*)self) ? 1 : 0;
+    }
+#endif
+#ifdef OBJC_SMALL_OBJECT_MASK
+  {
+    uintptr_t	p = (uintptr_t)anObject;
+
+    if (p & OBJC_SMALL_OBJECT_MASK)
+      {
+	return -1;	// Some other small object
+      }
+  }
+#endif
+  c = object_getClass(anObject);
+  if (c == NSConstantStringClass)
+    {
+      NXConstantString	*other = (NXConstantString*)anObject;
+
+      if (other->nxcslen != self->nxcslen)
+	{
+	  return 0;
+	}
+      if ((other->flags & 3) == (self->flags & 3))
+	{
+	  switch (self->flags & 3)
+	    {
+	      case 0:	// ASCII
+		return (memcmp(other->nxcsptr, self->nxcsptr,
+		  self->nxcslen) == 0) ? 1 : 0;
+	      case 2:	// UTF-16
+		return (memcmp(other->nxcsptr, self->nxcsptr,
+		  self->nxcslen * sizeof(unichar)) == 0) ? 1 : 0;
+	    }
+	}
+      return -1;
+    }
+  /* The class variables are only set up once a concrete string class has
+   * been initialised, which must have happened if anObject is one.  The
+   * concrete classes are checked first because GSObjCIsKindOf() makes a
+   * function call for each superclass (it doubled the time taken).
+   */
+  if (GSStringClass != 0
+    && (c == GSCInlineStringClass || c == GSCBufferStringClass
+      || c == GSCSubStringClass || c == GSMutableStringClass
+      || c == GSUInlineStringClass || c == GSUnicodeBufferStringClass
+      || c == GSUnicodeSubStringClass
+      || GSObjCIsKindOf(c, GSStringClass) == YES))
+    {
+      GSStr	other = (GSStr)anObject;
+
+      /* If both hashes are known (the constant string caches its hash
+       * once computed), strings with different hashes differ.
+       */
+      if ((self->flags & (1<<16)) && other->_flags.hash != 0
+	&& other->_flags.hash != self->hash)
+	{
+	  return 0;
+	}
+      return literalIsEqualInternal(self, other) ? 1 : 0;
+    }
+  return -1;
+}
+
 #  define CONSTANT_STRING_ENCODING() (flags & 3)
 #  define CONSTANT_STRING_HAS_HASH() ((flags & (1<<16)) == (1<<16))
 #  define CONSTANT_STRING_SET_HAS_HASH() do { flags |= (1<<16); } while(0)
@@ -6159,6 +6343,28 @@ literalIsEqual(NXConstantString *self, id anObject)
 }
 
 #ifdef GNUSTEP_NEW_STRING_ABI
+- (BOOL) isEqual: (id)anObject
+{
+  int	result = constantIsEqual(self, anObject);
+
+  if (result >= 0)
+    {
+      return (BOOL)result;
+    }
+  return [super isEqual: anObject];
+}
+
+- (BOOL) isEqualToString: (NSString*)aString
+{
+  int	result = constantIsEqual(self, aString);
+
+  if (result >= 0)
+    {
+      return (BOOL)result;
+    }
+  return [super isEqualToString: aString];
+}
+
 - (NSUInteger) length
 {
   // In the new encoding, nxcslen is always the length of the string in UTF-16
