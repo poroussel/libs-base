@@ -1,0 +1,8 @@
+obj/
+corpus/
+seeds/
+crashes/
+logs/
+min/
+dbg/
+old/

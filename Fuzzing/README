@@ -1,0 +1,121 @@
+libFuzzer harnesses for gnustep-base
+====================================
+
+These harnesses feed arbitrary bytes to the parsers and decoders that
+commonly handle untrusted data:
+
+  fuzz_plist       NSPropertyListSerialization, all formats (autodetected)
+  fuzz_bplist      binary property lists only (input prefixed by "bplist00")
+  fuzz_json        NSJSONSerialization
+  fuzz_xml         GSSloppyXMLParser (GNUstep's own XML parser, also used
+                   for XML property lists)
+  fuzz_mime        GSMimeParser, whole document and in small chunks
+  fuzz_keyed       NSKeyedUnarchiver
+  fuzz_unarchiver  NSUnarchiver
+  fuzz_portcoder   NSPortCoder (an incoming Distributed Objects message)
+  fuzz_http        an HTTP response handled as NSURLProtocol does: GSMimeParser
+                   in HTTP mode, NSHTTPURLResponse, redirects, cookies and
+                   WWW-Authenticate challenges (GSHTTPAuthentication)
+  fuzz_cookie      NSHTTPCookie Set-Cookie/Set-Cookie2 parsing
+  fuzz_url         NSURL (absolute and relative) and NSURLComponents
+  fuzz_uritemplate GSURITemplate (RFC 6570) parsing and expansion
+  fuzz_predicate   NSPredicate/NSExpression format parsing
+  fuzz_encoding    NSString conversion from and to every available encoding
+  fuzz_base64      base64 and hexadecimal decoders, encode/decode round trips
+  fuzz_tzif        NSTimeZone from TZif (tzfile) data
+  fuzz_format      GSFormat (-initWithFormat:...) with arbitrary format strings
+                   (see the harness for how the arguments are made safe)
+  fuzz_scanner     NSScanner, a sequence of scan operations on a string
+  fuzz_decimal     NSDecimalNumber/NSDecimal parsing, arithmetic, rounding
+  fuzz_calendardate NSCalendarDate parsing and printing with calendar formats
+  fuzz_regex       NSRegularExpression (GNUstep's code around ICU uregex)
+  fuzz_charset     NSCharacterSet from bitmap data (with inputs of up to
+                   40000 bytes, so that they cover more than the first plane)
+
+An NSException raised for bad input is expected behaviour and is caught;
+crashes, sanitizer reports, hangs and excessive memory use are bugs.
+fuzz_base64 also aborts when an encode/decode round trip does not give
+back the input.
+
+Building and running
+--------------------
+
+The harnesses are built with gnustep-make, like any program using
+gnustep-base: with the compiler and flags of the installed gnustep-make,
+against the installed gnustep-base (headers and library), not the one
+in this source tree.  Install the version to be fuzzed first.
+
+When the compiler provides libFuzzer (clang), the harnesses are linked
+with it.  Otherwise (gcc), they are linked with standalone.c, a simple
+driver which understands the same main options: it runs the inputs
+given on the command line, or fuzzes by random mutations of the corpus
+files.  It has no coverage feedback, so it finds much less than
+libFuzzer, but it still finds shallow bugs and replays inputs.
+
+From the top of the source tree ('make' alone does not build them):
+
+  make fuzz                    build, then fuzz each harness for 5 minutes
+  make fuzz-replay             run each harness once over its corpus
+  make fuzz-triage             one line per saved crash input
+
+or in this directory:
+
+  make                         build every harness (in obj/) and seedgen
+  make fuzz                    fuzz each harness for 5 minutes in turn
+  make replay                  run each harness once over its corpus
+  make triage                  one line per saved crash input
+  make clean                   remove obj/
+
+Variables, given on the command line:
+
+  fuzzobj=plist,json   only build and run these harnesses (names with or
+                       without the fuzz_ prefix, separated by commas or
+                       spaces); the default is all of them
+  fuzztime=600         seconds to fuzz each harness (default 300)
+  fuzzargs="-seed=1"   extra options for libFuzzer (or standalone.c)
+  fuzzengine=standalone  link with standalone.c even if libFuzzer is
+                       available
+  asan=no              build without AddressSanitizer
+
+Run 'make clean' after changing asan or fuzzengine: gnustep-make does
+not rebuild objects when only the flags change.
+
+For example, from the top of the source tree:
+
+  make fuzz fuzzobj=plist,bplist fuzztime=600
+
+On its first run for a harness, 'make fuzz' fills corpus/ with the
+seeds made by seedgen.  The corpus then grows in corpus/<harness>/;
+crash, timeout and out-of-memory reproducers are stored in
+crashes/<harness>/ and the libFuzzer output in logs/<harness>.log.
+Fuzzing keeps going after a crash (libFuzzer -fork=1 -ignore_crashes=1;
+standalone.c stops and run.sh starts it again);
+'make fuzz' fails at the end if new reproducers were saved.  To
+reproduce one:
+
+  ASAN_OPTIONS=detect_leaks=0 obj/fuzz_plist <file>
+
+Leak detection is disabled because the runtime and some caches keep
+objects alive for the life of the process.
+
+Instrumenting the library
+-------------------------
+
+libFuzzer is guided by the code coverage of the program, and
+AddressSanitizer only checks memory accesses in code compiled with it.
+With an ordinary gnustep-base, only the harnesses themselves are
+instrumented: libFuzzer then mutates almost blindly, and a bad access
+inside the library is caught only when it goes through a function
+AddressSanitizer intercepts (memcpy(), strlen(), free()...).  For real
+fuzzing, install a gnustep-base compiled with instrumentation:
+
+  ./configure
+  make asan=yes ADDITIONAL_OBJCFLAGS=-fsanitize=fuzzer-no-link \
+    ADDITIONAL_CFLAGS=-fsanitize=fuzzer-no-link
+  make install
+
+(with gcc, which has no libFuzzer, only 'make asan=yes').
+
+Programs not built with these flags cannot use such a library, so do
+this in a GNUstep installation kept for fuzzing (a container, or a
+separate installation prefix with its own GNUstep.sh).

@@ -1,3 +1,30 @@
+2026-11-15 Philippe Roussel <p.o.roussel@free.fr>
+
+	* Fuzzing/GNUmakefile:
+	* Fuzzing/README:
+	* Fuzzing/.gitignore:
+	* Fuzzing/fuzz_common.h:
+	* Fuzzing/fuzz_*.m:
+	* Fuzzing/seedgen.m:
+	* Fuzzing/standalone.c:
+	* Fuzzing/run.sh:
+	* Fuzzing/replay.sh:
+	* Fuzzing/triage.sh:
+	New directory: fuzzing harnesses for the parsers and decoders that
+	handle untrusted data (property lists, JSON, XML, MIME, archivers,
+	Distributed Objects messages, HTTP responses, cookies, URLs, URI
+	templates, predicates, character encodings, base64/hex, TZif data)
+	and for parsers of strings usually supplied by the program (format
+	strings, NSScanner, NSDecimalNumber, NSCalendarDate,
+	NSRegularExpression, NSCharacterSet bitmaps).  They are built with
+	gnustep-make against the installed gnustep-base, with
+	AddressSanitizer unless asan=no, and linked with libFuzzer when the
+	compiler provides it, or with standalone.c, a replay and mutation
+	driver, otherwise (gcc).
+	* Makefile.postamble: Add 'make fuzz', 'make fuzz-replay' and
+	'make fuzz-triage', which build and run the harnesses; fuzzobj=
+	selects them as testobj= does for 'make check'.
+
 2026-11-06 Daniel Boyd <danieljboyd@icloud.com>
 
 	* Source/NSScanner.m (-scanDouble:): Count integer digits beyond the
