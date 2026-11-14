@@ -1,5 +1,15 @@
 2026-11-15 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Fuzzing/GNUmakefile: Add fuzzlib=local, which builds the
+	harnesses against the library and headers of the source tree
+	instead of the installed ones, as 'make check' does; the library
+	is found through DT_RPATH, so that LD_LIBRARY_PATH does not bring
+	back the installed one.
+	* Fuzzing/README: Document it, and fuzzing an instrumented build
+	tree with it.
+
+2026-11-15 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Fuzzing/GNUmakefile:
 	* Fuzzing/README:
 	* Fuzzing/.gitignore:

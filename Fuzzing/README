@@ -42,8 +42,11 @@ Building and running
 
 The harnesses are built with gnustep-make, like any program using
 gnustep-base: with the compiler and flags of the installed gnustep-make,
-against the installed gnustep-base (headers and library), not the one
-in this source tree.  Install the version to be fuzzed first.
+against the installed gnustep-base (headers and library) by default.
+Install the version to be fuzzed first, or use fuzzlib=local to build
+them against the library built in this source tree (after ./configure
+and make at the top), with the headers in Headers/, as 'make check'
+does.
 
 When the compiler provides libFuzzer (clang), the harnesses are linked
 with it.  Otherwise (gcc), they are linked with standalone.c, a simple
@@ -76,9 +79,17 @@ Variables, given on the command line:
   fuzzengine=standalone  link with standalone.c even if libFuzzer is
                        available
   asan=no              build without AddressSanitizer
+  fuzzlib=local        link with the library built in ../Source and
+                       compile with the headers in ../Headers, instead
+                       of the installed ones (fuzzlib=installed, the
+                       default)
 
-Run 'make clean' after changing asan or fuzzengine: gnustep-make does
-not rebuild objects when only the flags change.
+Run 'make clean' after changing asan, fuzzengine or fuzzlib:
+gnustep-make does not rebuild objects when only the flags change.
+
+With fuzzlib=local the harnesses find the library through an RPATH
+entry, which takes precedence over LD_LIBRARY_PATH, so they use the
+build tree's library however they are started.
 
 For example, from the top of the source tree:
 
@@ -107,7 +118,17 @@ With an ordinary gnustep-base, only the harnesses themselves are
 instrumented: libFuzzer then mutates almost blindly, and a bad access
 inside the library is caught only when it goes through a function
 AddressSanitizer intercepts (memcpy(), strlen(), free()...).  For real
-fuzzing, install a gnustep-base compiled with instrumentation:
+fuzzing, use a gnustep-base compiled with instrumentation.  The
+simplest is to build the source tree with it and use fuzzlib=local:
+
+  ./configure
+  make asan=yes ADDITIONAL_OBJCFLAGS=-fsanitize=fuzzer-no-link \
+    ADDITIONAL_CFLAGS=-fsanitize=fuzzer-no-link
+  make fuzz fuzzlib=local
+
+('make clean' and 'make' again before using the tree for anything
+else, such as 'make check' or 'make install').  Or install such a
+library:
 
   ./configure
   make asan=yes ADDITIONAL_OBJCFLAGS=-fsanitize=fuzzer-no-link \
@@ -116,6 +137,6 @@ fuzzing, install a gnustep-base compiled with instrumentation:
 
 (with gcc, which has no libFuzzer, only 'make asan=yes').
 
-Programs not built with these flags cannot use such a library, so do
-this in a GNUstep installation kept for fuzzing (a container, or a
-separate installation prefix with its own GNUstep.sh).
+Programs not built with these flags cannot use such a library, so
+install it only in a GNUstep installation kept for fuzzing (a
+container, or a separate installation prefix with its own GNUstep.sh).

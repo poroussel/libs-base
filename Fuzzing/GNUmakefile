@@ -23,7 +23,8 @@
 #
 #  The harnesses are built like any program using gnustep-base: with
 #  the compiler and flags of the installed gnustep-make, against the
-#  installed gnustep-base (not the one in this source tree).  They are
+#  installed gnustep-base, or with fuzzlib=local against the one built
+#  in this source tree (as 'make check' does).  They are
 #  linked with libFuzzer when the compiler provides it (clang), and with
 #  standalone.c, a simple mutation fuzzer, otherwise (gcc).
 #
@@ -40,6 +41,9 @@
 #    fuzzargs=...            extra options for the fuzzing engine
 #    fuzzengine=standalone   use standalone.c even if libFuzzer is there
 #    asan=no                 build without AddressSanitizer
+#    fuzzlib=local           link with the library built in ../Source
+#                            (headers from ../Headers) instead of the
+#                            installed one
 #
 
 ifeq ($(GNUSTEP_MAKEFILES),)
@@ -59,9 +63,24 @@ ifeq ($(GNUSTEP_MAKEFILES),)
   $(error You need to set GNUSTEP_MAKEFILES before running this!)
 endif
 
-# Use the installed gnustep-base, even when called from the top level
-# makefile of the source tree, which points this at its own base.make.
-override GNUSTEP_LOCAL_ADDITIONAL_MAKEFILES =
+# Use the installed gnustep-base (fuzzlib=installed, the default), even
+# when called from the top level makefile of the source tree, which
+# points this at its own base.make; or, with fuzzlib=local, the library
+# built in the source tree, with its headers and base.make.
+TOP_DIR := $(abspath $(CURDIR)/..)
+ifeq ($(fuzzlib),)
+  fuzzlib = installed
+endif
+ifeq ($(fuzzlib),installed)
+  override GNUSTEP_LOCAL_ADDITIONAL_MAKEFILES =
+else ifeq ($(fuzzlib),local)
+  ifeq ($(wildcard $(TOP_DIR)/base.make),)
+    $(error fuzzlib=local: $(TOP_DIR)/base.make is missing, run ./configure and make at the top of the source tree first)
+  endif
+  override GNUSTEP_LOCAL_ADDITIONAL_MAKEFILES = $(TOP_DIR)/base.make
+else
+  $(error fuzzlib must be installed or local)
+endif
 
 # AddressSanitizer unless 'asan=no' (gnustep-make adds the flags).
 ifeq ($(asan),)
@@ -70,8 +89,21 @@ endif
 
 include $(GNUSTEP_MAKEFILES)/common.make
 
-ifeq ($(FND_LIBS),)
-  $(error gnustep-base is not installed (no base.make in $(GNUSTEP_MAKEFILES)/Additional): the fuzzing harnesses link to the installed library, so run 'make install' first)
+ifeq ($(fuzzlib),local)
+  LOCAL_LIB_DIR := $(TOP_DIR)/Source/$(GNUSTEP_OBJ_DIR)
+  ifeq ($(wildcard $(LOCAL_LIB_DIR)/libgnustep-base*),)
+    $(error fuzzlib=local: no library in $(LOCAL_LIB_DIR), run make at the top of the source tree first)
+  endif
+  # The build tree's headers come before the installed ones.  The
+  # library is found through DT_RPATH, which unlike DT_RUNPATH takes
+  # precedence over LD_LIBRARY_PATH (set by GNUstep.sh to the installed
+  # library's directory), so that the harnesses use it however started.
+  ADDITIONAL_INCLUDE_DIRS += -I$(TOP_DIR)/Headers \
+    -I$(TOP_DIR)/Source/$(GNUSTEP_TARGET_DIR)
+  ADDITIONAL_LIB_DIRS += -L$(LOCAL_LIB_DIR)
+  ADDITIONAL_LDFLAGS += -Wl,-rpath,$(LOCAL_LIB_DIR) -Wl,--disable-new-dtags
+else ifeq ($(FND_LIBS),)
+  $(error gnustep-base is not installed (no base.make in $(GNUSTEP_MAKEFILES)/Additional): the fuzzing harnesses link to the installed library, so run 'make install' first, or use fuzzlib=local)
 endif
 
 comma := ,
