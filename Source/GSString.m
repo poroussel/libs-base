@@ -5302,6 +5302,7 @@ NSAssert(_flags.owned == 1 && _zone != 0, NSInternalInconsistencyException);
   if (len == 0)
     {
       _count = 0;
+      _flags.hash = 0;
       return;
     }
   other = transmute((GSStr)self, aString);
