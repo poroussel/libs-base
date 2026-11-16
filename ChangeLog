@@ -1,5 +1,13 @@
 2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: Name the values of the flags field of constant
+	strings (new string ABI): GSConstantStringASCII, GSConstantStringUTF8,
+	GSConstantStringUTF16, GSConstantStringUTF32,
+	GSConstantStringEncodingMask, GSConstantStringHasHash and the
+	GSConstantStringEncoding() macro, used instead of 0 to 3, 3 and 1<<16.
+
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: newCInline(): allocate one byte more, so that the
 	characters of an inline string are always followed by a nul byte.
 	-[GSCInlineString UTF8String]: return the characters themselves when

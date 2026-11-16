@@ -84,6 +84,23 @@ struct objc_class _NSConstantStringClassReference;
 #define UTF8_BYTE_COUNT(c) \
   (((c) < 0xf8) ? 1 + ((c) >= 0xc0) + ((c) >= 0xe0) + ((c) >= 0xf0) : 0)
 
+#ifdef GNUSTEP_NEW_STRING_ABI
+/* The flags field of a constant string (NXConstantString, see NSString.h).
+ * The low two bits, set by the compiler, give the encoding of the data
+ * nxcsptr points to; bit 16 is set by this file once the hash field holds
+ * the hash of the string.
+ */
+enum {
+  GSConstantStringASCII = 0,
+  GSConstantStringUTF8 = 1,
+  GSConstantStringUTF16 = 2,
+  GSConstantStringUTF32 = 3,
+  GSConstantStringEncodingMask = 3,
+  GSConstantStringHasHash = (1<<16)
+};
+#define GSConstantStringEncoding(s) ((s)->flags & GSConstantStringEncodingMask)
+#endif
+
 
 #ifndef GNUSTEP_NEW_STRING_ABI
 /* Determine the length of the UTF-8 string as a unicode (UTF-16) string.
@@ -305,9 +322,9 @@ literalIsEqualInternal(NXConstantString *s, GSStr o)
     {
       return NO;
     }
-  switch (s->flags & 3)
+  switch (GSConstantStringEncoding(s))
     {
-      case 0:	// ASCII
+      case GSConstantStringASCII:
 	if (0 == o->_flags.wide)
 	  {
 	    /* ASCII is a subset of the internal encoding, so the strings
@@ -331,7 +348,7 @@ literalIsEqualInternal(NXConstantString *s, GSStr o)
 	      }
 	    return YES;
 	  }
-      case 2:	// UTF-16
+      case GSConstantStringUTF16:
 	if (1 == o->_flags.wide)
 	  {
 	    return (memcmp(o->_contents.u, s->nxcsptr,
@@ -1328,14 +1345,14 @@ directChars(NSString *aString, GSDirectChars *d, unsigned char *tiny)
     {
       NXConstantString	*k = (NXConstantString*)aString;
 
-      switch (k->flags & 3)
+      switch (GSConstantStringEncoding(k))
 	{
-	  case 0:	// ASCII
+	  case GSConstantStringASCII:
 	    d->c = (const unsigned char*)k->nxcsptr;
 	    d->u = 0;
 	    d->count = k->nxcslen;
 	    return YES;
-	  case 2:	// UTF-16
+	  case GSConstantStringUTF16:
 	    d->c = 0;
 	    d->u = (const unichar*)(void*)k->nxcsptr;
 	    d->count = k->nxcslen;
@@ -6133,14 +6150,14 @@ constantIsEqual(NXConstantString *self, id anObject)
 	{
 	  return 0;
 	}
-      if ((other->flags & 3) == (self->flags & 3))
+      if (GSConstantStringEncoding(other) == GSConstantStringEncoding(self))
 	{
-	  switch (self->flags & 3)
+	  switch (GSConstantStringEncoding(self))
 	    {
-	      case 0:	// ASCII
+	      case GSConstantStringASCII:
 		return (memcmp(other->nxcsptr, self->nxcsptr,
 		  self->nxcslen) == 0) ? 1 : 0;
-	      case 2:	// UTF-16
+	      case GSConstantStringUTF16:
 		return (memcmp(other->nxcsptr, self->nxcsptr,
 		  self->nxcslen * sizeof(unichar)) == 0) ? 1 : 0;
 	    }
@@ -6164,7 +6181,7 @@ constantIsEqual(NXConstantString *self, id anObject)
       /* If both hashes are known (the constant string caches its hash
        * once computed), strings with different hashes differ.
        */
-      if ((self->flags & (1<<16)) && other->_flags.hash != 0
+      if ((self->flags & GSConstantStringHasHash) && other->_flags.hash != 0
 	&& other->_flags.hash != self->hash)
 	{
 	  return 0;
@@ -6174,14 +6191,16 @@ constantIsEqual(NXConstantString *self, id anObject)
   return -1;
 }
 
-#  define CONSTANT_STRING_ENCODING() (flags & 3)
-#  define CONSTANT_STRING_HAS_HASH() ((flags & (1<<16)) == (1<<16))
-#  define CONSTANT_STRING_SET_HAS_HASH() do { flags |= (1<<16); } while(0)
+#  define CONSTANT_STRING_ENCODING() (flags & GSConstantStringEncodingMask)
+#  define CONSTANT_STRING_HAS_HASH() \
+  ((flags & GSConstantStringHasHash) == GSConstantStringHasHash)
+#  define CONSTANT_STRING_SET_HAS_HASH() \
+  do { flags |= GSConstantStringHasHash; } while(0)
 #endif
 
 #ifdef GNUSTEP_NEW_STRING_ABI
-/* clang emits constant strings as ASCII (flag 0) or UTF-16 (flag 2).  The
- * ABI also defines UTF-8 (1) and UTF-32 (3), for which nxcslen is still
+/* clang emits constant strings as ASCII or UTF-16.  The ABI also
+ * defines UTF-8 and UTF-32, for which nxcslen is still
  * the length in UTF-16 code units and size the length in bytes.  Return
  * the characters of such a string as UTF-16 code units, in an autoreleased
  * buffer.  This is a slow path, there so that these strings work if a
@@ -6199,7 +6218,7 @@ constantUnichars(NXConstantString *s)
     {
       return &none;
     }
-  if (1 == (s->flags & 3))
+  if (GSConstantStringUTF8 == GSConstantStringEncoding(s))
     {
       unsigned	l = 0;
 
@@ -6271,10 +6290,10 @@ constantUnichars(NXConstantString *s)
 #ifdef GNUSTEP_NEW_STRING_ABI
   switch (CONSTANT_STRING_ENCODING())
     {
-      case 0: // ASCII
-      case 1: // UTF-8
+      case GSConstantStringASCII:
+      case GSConstantStringUTF8:
 	  return nxcsptr;
-      case 2: // UTF-16
+      case GSConstantStringUTF16:
 	{
 	  unsigned int l = 0;
 	  unsigned char *r = 0;
@@ -6288,7 +6307,7 @@ constantUnichars(NXConstantString *s)
 	    }
 	  return (const char*)r;
 	}
-      case 3: // UTF-32
+      case GSConstantStringUTF32:
 	{
 	  unsigned int l = 0;
 	  unsigned char *r = 0;
@@ -6319,12 +6338,12 @@ constantUnichars(NXConstantString *s)
     }
   switch (CONSTANT_STRING_ENCODING())
   {
-      case 0: // ASCII
+      case GSConstantStringASCII:
 	  return nxcsptr[index];
-      case 2: // UTF-16
+      case GSConstantStringUTF16:
 	  return ((unichar*)(void*)nxcsptr)[index];
-      case 1: // UTF-8 (index is in UTF-16 code units, not bytes)
-      case 3: // UTF-32
+      case GSConstantStringUTF8: // index is in UTF-16 code units, not bytes
+      case GSConstantStringUTF32:
 	  return constantUnichars(self)[index];
   }
   GS_UNREACHABLE();
@@ -6463,17 +6482,17 @@ constantUnichars(NXConstantString *s)
   GS_RANGE_CHECK(aRange, nxcslen);
   switch (CONSTANT_STRING_ENCODING())
   {
-      case 0: // ASCII
+      case GSConstantStringASCII:
 	for (int i=0 ; i<aRange.length ; i++)
 	  {
 	    buffer[i] = (unichar)nxcsptr[aRange.location + i];
 	  }
 	return;
-      case 2: // UTF-16
+      case GSConstantStringUTF16:
 	memcpy(buffer, nxcsptr + (aRange.location * sizeof(unichar)), aRange.length * sizeof(unichar));
 	return;
-      case 1: // UTF-8
-      case 3: // UTF-32
+      case GSConstantStringUTF8:
+      case GSConstantStringUTF32:
 	memcpy(buffer, constantUnichars(self) + aRange.location,
 	  aRange.length * sizeof(unichar));
 	return;
@@ -6869,13 +6888,13 @@ constantUnichars(NXConstantString *s)
 #ifdef GNUSTEP_NEW_STRING_ABI
   switch (CONSTANT_STRING_ENCODING())
   {
-      case 0: // ASCII
+      case GSConstantStringASCII:
 	return NSASCIIStringEncoding;
-      case 1: // UTF-8
+      case GSConstantStringUTF8:
 	  return NSUTF8StringEncoding;
-      case 2: // UTF-16
+      case GSConstantStringUTF16:
 	  return NSUTF16StringEncoding;
-      case 3: // UTF-32
+      case GSConstantStringUTF32:
 	  return NSUTF32StringEncoding;
   }
   GS_UNREACHABLE();
@@ -6891,12 +6910,12 @@ constantUnichars(NXConstantString *s)
   // we'll pretend that it is.
   switch (CONSTANT_STRING_ENCODING())
   {
-      case 0: // ASCII
+      case GSConstantStringASCII:
 	return NSASCIIStringEncoding;
-      case 1: // UTF-8
+      case GSConstantStringUTF8:
 	  return NSUTF8StringEncoding;
-      case 2: // UTF-16
-      case 3: // UTF-32
+      case GSConstantStringUTF16:
+      case GSConstantStringUTF32:
 	  return NSUTF16StringEncoding;
   }
   GS_UNREACHABLE();
