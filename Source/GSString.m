@@ -1951,6 +1951,52 @@ fixBOM(unsigned char **bytes, NSUInteger*length, BOOL *owned,
       unichar	                *u = 0;
       unsigned	                l = 0;
 
+      if (internalEncoding == NSISOLatin1StringEncoding)
+	{
+	  NSUInteger	count = 0;
+	  NSUInteger	i;
+
+	  /* The code points U+0080 to U+00FF are the Latin-1 characters,
+	   * encoded in UTF-8 as 0xC2 or 0xC3 followed by a continuation
+	   * byte.  If every non-ASCII sequence is one of these, store the
+	   * string as 8-bit Latin-1 characters, as -initWithBytes:...
+	   * does, instead of UTF-16 (half the memory, and the faster
+	   * 8-bit code paths).  Anything else, including invalid data,
+	   * goes through the general conversion below.
+	   */
+	  for (i = 0; i < length; i++)
+	    {
+	      c = b[i];
+	      if (c > 127)
+		{
+		  if ((c != 0xC2 && c != 0xC3)
+		    || (b[i + 1] & 0xC0) != 0x80)
+		    {
+		      break;
+		    }
+		  i++;
+		}
+	      count++;
+	    }
+	  if (i == length)
+	    {
+	      unsigned char	*d;
+
+	      me = (GSStr)newCInline(count, myZone);
+	      d = me->_contents.c;
+	      for (i = 0; i < length; i++)
+		{
+		  c = b[i];
+		  if (c > 127)
+		    {
+		      c = ((c & 0x03) << 6) | (b[++i] & 0x3F);
+		    }
+		  *d++ = c;
+		}
+	      return (id)me;
+	    }
+	}
+
       if (GSToUnicode(&u, &l, b, length, NSUTF8StringEncoding, myZone, 0) == NO)
 	{
 	  return nil;	// Invalid data

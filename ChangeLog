@@ -1,5 +1,13 @@
 2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: -[GSPlaceholderString initWithUTF8String:]:
+	with a Latin-1 internal encoding, store UTF-8 data whose characters
+	are all in Latin-1 as 8-bit characters, as -initWithBytes:... does,
+	instead of UTF-16.
+	* Tests/base/NSString/utf8-init-latin1.m: New test.
+
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: UTF8String_c(): produce the UTF-8 bytes of
 	ASCII and Latin-1 8-bit strings directly, instead of converting to
 	UTF-16 and then to UTF-8.
