@@ -4864,6 +4864,46 @@ agree, create a new GSUInlineString otherwise.
  * move from an 8-bit to a 16-bit representation is that should be
  * necessary because wide characters have been placed in the string.
  */
+/* Return YES if aString is a GSString (or the immutable proxy of one)
+ * holding its characters as 8-bit characters in the internal encoding,
+ * so that a string taking all of its content can hold it as 8-bit
+ * characters too.  Tiny strings and constant strings are recognised by
+ * directChars().
+ */
+static BOOL
+heldAsEightBit(NSString *aString)
+{
+  Class	c = object_getClass(aString);
+
+  if (c == GSImmutableStringClass)
+    {
+      aString = object_getIvar(aString, immutableIvar);
+      c = object_getClass(aString);
+    }
+  if (c == GSMutableStringClass)
+    {
+      return ((GSStr)aString)->_flags.wide == 0 ? YES : NO;
+    }
+  return GSObjCIsKindOf(c, GSCStringClass);
+}
+
+/* Once widened, a mutable string used to stay UTF-16 for good.  When its
+ * whole content is about to be replaced by 8-bit characters (or removed),
+ * make it hold 8-bit characters again, reusing the buffer, which has room
+ * for twice as many of them.  Only for a buffer the string owns.
+ */
+static inline void
+narrowEmptied(GSStr s)
+{
+  if (s->_flags.wide == 1 && s->_flags.owned == 1
+    && s->_capacity <= UINT_MAX / 2)
+    {
+      s->_flags.wide = 0;
+      s->_capacity *= 2;
+      s->_count = 0;
+    }
+}
+
 @implementation GSMutableString
 
 + (void) initialize
@@ -5718,10 +5758,18 @@ NSAssert(_flags.owned == 1 && _zone != 0, NSInternalInconsistencyException);
 
   if (aString != nil && directChars(aString, &d, tiny))
     {
+      if (_flags.wide == 1 && d.c != 0)
+	{
+	  narrowEmptied((GSStr)self);	// ASCII literal or tiny string
+	}
       replaceDirect((GSStr)self, NSMakeRange(0, _count), &d);
       return;
     }
   len = (aString == nil) ? 0 : [aString length];
+  if (_flags.wide == 1 && (len == 0 || heldAsEightBit(aString)))
+    {
+      narrowEmptied((GSStr)self);
+    }
   if (len == 0)
     {
       _count = 0;

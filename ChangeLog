@@ -1,5 +1,14 @@
 2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: -[GSMutableString setString:]: go back to 8-bit
+	characters, reusing the buffer, when a UTF-16 string is emptied or
+	gets the whole content of a string held as 8-bit characters
+	(including ASCII literals and tiny strings).
+	(heldAsEightBit, narrowEmptied): New functions.
+	* Tests/base/NSMutableString/narrow-on-set.m: New test.
+
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: -[GSPlaceholderString initWithUTF8String:]:
 	with a Latin-1 internal encoding, store UTF-8 data whose characters
 	are all in Latin-1 as 8-bit characters, as -initWithBytes:... does,
