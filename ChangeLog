@@ -1,3 +1,10 @@
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
+	* Source/GSString.m: UTF8String_c(): produce the UTF-8 bytes of
+	ASCII and Latin-1 8-bit strings directly, instead of converting to
+	UTF-16 and then to UTF-8.
+	* Tests/base/NSString/utf8string-8bit.m: New test.
+
 2026-11-11 Philippe Roussel <p.o.roussel@free.fr>
 
 	* Source/GSString.m: -[GSPlaceholderString initWithString:]: copy

@@ -1999,6 +1999,21 @@ fixBOM(unsigned char **bytes, NSUInteger*length, BOOL *owned,
  * peculiar to its memory management (shrinking, growing, and converting).
  */
 
+/* Return YES if the 8-bit characters are all ASCII.
+ */
+static inline BOOL
+isASCII_c(const unsigned char *c, unsigned count)
+{
+  while (count-- > 0)
+    {
+      if (*c++ > 127)
+	{
+	  return NO;
+	}
+    }
+  return YES;
+}
+
 static inline const char*
 UTF8String_c(GSStr self)
 {
@@ -2018,6 +2033,49 @@ UTF8String_c(GSStr self)
 	  r[i] = self->_contents.c[i] & 0x7f;
 	}
       r[self->_count] = '\0';
+    }
+  else if (internalEncoding == NSISOLatin1StringEncoding
+    || isASCII_c(self->_contents.c, self->_count))
+    {
+      const unsigned char	*c = self->_contents.c;
+      unsigned			count = self->_count;
+      unsigned			extra = 0;
+      unsigned			i;
+
+      /* ASCII is a subset of UTF-8 (and of the internal encoding), and
+       * Latin-1 characters are the code points U+0000 to U+00FF, so
+       * the UTF-8 bytes can be produced directly, without converting to
+       * UTF-16 first.  Each character from 0x80 takes two bytes.
+       */
+      for (i = 0; i < count; i++)
+	{
+	  extra += c[i] >> 7;
+	}
+      r = (unsigned char*)GSAutoreleasedBuffer(count + extra + 1);
+      if (0 == extra)
+	{
+	  memcpy(r, c, count);
+	}
+      else
+	{
+	  unsigned char	*p = r;
+
+	  for (i = 0; i < count; i++)
+	    {
+	      unsigned char	b = c[i];
+
+	      if (b < 0x80)
+		{
+		  *p++ = b;
+		}
+	      else
+		{
+		  *p++ = 0xC0 | (b >> 6);
+		  *p++ = 0x80 | (b & 0x3F);
+		}
+	    }
+	}
+      r[count + extra] = '\0';
     }
   else
     {
