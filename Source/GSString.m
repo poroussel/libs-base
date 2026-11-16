@@ -784,8 +784,12 @@ newCInline(unsigned length, NSZone *zone)
 {
   GSCInlineString *me;
 
+  /* One byte more than the characters: the memory is zeroed, so the
+   * characters are always followed by a nul byte, which lets
+   * -UTF8String return them directly (see GSCInlineString).
+   */
   me = (GSCInlineString*)
-    NSAllocateObject(GSCInlineStringClass, length, zone);
+    NSAllocateObject(GSCInlineStringClass, length + 1, zone);
   me->_contents.c = (unsigned char*)
     (((void*)me)+class_getInstanceSize(GSCInlineStringClass));
   me->_count = length;
@@ -4380,6 +4384,25 @@ agree, create a new GSCInlineString otherwise.
 
 
 @implementation	GSCInlineString
+/* The characters of an inline string are followed by a nul byte (see
+ * newCInline()).  When they are all ASCII they already are the UTF-8
+ * form of the string, so return them instead of a copy.  The string is
+ * retained and autoreleased, so that the pointer stays valid as long as
+ * a copy in an autoreleased buffer would have (until the current pool
+ * is drained), even if the caller releases the string; the string is
+ * immutable, so the bytes cannot change meanwhile.
+ */
+- (const char *) UTF8String
+{
+  if (_count > 0 && _contents.c[_count] == 0
+    && isASCII_c(_contents.c, _count))
+    {
+      AUTORELEASE(RETAIN(self));
+      return (const char*)_contents.c;
+    }
+  return UTF8String_c((GSStr)self);
+}
+
 - (NSUInteger) sizeOfContentExcluding: (NSHashTable*)exclude
 {
   return 0;	// Inline string content uses no heap

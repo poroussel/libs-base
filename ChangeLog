@@ -1,5 +1,14 @@
 2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: newCInline(): allocate one byte more, so that the
+	characters of an inline string are always followed by a nul byte.
+	-[GSCInlineString UTF8String]: return the characters themselves when
+	they are all ASCII, retaining and autoreleasing the string, instead of
+	a copy in an autoreleased buffer.
+	* Tests/base/NSString/utf8string-inline.m: New test.
+
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: NXConstantString (new string ABI): handle the
 	UTF-8 and UTF-32 encodings of constant strings in -characterAtIndex:,
 	-getCharacters:range: and -UTF8String (which tested for UTF-32 with
