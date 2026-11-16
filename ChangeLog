@@ -1,5 +1,14 @@
 2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
 
+	* Source/GSString.m: NXConstantString (new string ABI): handle the
+	UTF-8 and UTF-32 encodings of constant strings in -characterAtIndex:,
+	-getCharacters:range: and -UTF8String (which tested for UTF-32 with
+	the value 4 instead of 3).
+	(constantUnichars): New function.
+	* Tests/base/NSString/constant-utf8-utf32.m: New test.
+
+2026-11-16 Philippe Roussel <p.o.roussel@free.fr>
+
 	* Source/GSString.m: -[GSMutableString setString:]: go back to 8-bit
 	characters, reusing the buffer, when a UTF-16 string is emptied or
 	gets the whole content of a string held as 8-bit characters

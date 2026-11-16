@@ -6156,6 +6156,76 @@ constantIsEqual(NXConstantString *self, id anObject)
 #  define CONSTANT_STRING_SET_HAS_HASH() do { flags |= (1<<16); } while(0)
 #endif
 
+#ifdef GNUSTEP_NEW_STRING_ABI
+/* clang emits constant strings as ASCII (flag 0) or UTF-16 (flag 2).  The
+ * ABI also defines UTF-8 (1) and UTF-32 (3), for which nxcslen is still
+ * the length in UTF-16 code units and size the length in bytes.  Return
+ * the characters of such a string as UTF-16 code units, in an autoreleased
+ * buffer.  This is a slow path, there so that these strings work if a
+ * compiler ever emits them; data that does not match nxcslen raises an
+ * exception rather than being read out of bounds.
+ */
+static const unichar *
+constantUnichars(NXConstantString *s)
+{
+  static const unichar	none = 0;
+  unsigned		len = s->nxcslen;
+  unichar		*u = 0;
+
+  if (0 == len)
+    {
+      return &none;
+    }
+  if (1 == (s->flags & 3))
+    {
+      unsigned	l = 0;
+
+      if (GSToUnicode(&u, &l, (const unsigned char*)s->nxcsptr, s->size,
+	NSUTF8StringEncoding, NSDefaultMallocZone(), GSUniTemporary) == NO
+	|| l != len)
+	{
+	  [NSException raise: NSInternalInconsistencyException
+		      format: @"malformed UTF-8 constant string"];
+	}
+    }
+  else
+    {
+      const uint32_t	*p = (const uint32_t*)(void*)s->nxcsptr;
+      unsigned		count = s->size / sizeof(uint32_t);
+      unsigned		i;
+      unsigned		j = 0;
+
+      u = GSAutoreleasedBuffer(len * sizeof(unichar));
+      for (i = 0; i < count; i++)
+	{
+	  uint32_t	c = p[i];
+
+	  if (c > 0x10FFFF || (c >= 0xD800 && c <= 0xDFFF)
+	    || j + (c > 0xFFFF ? 2 : 1) > len)
+	    {
+	      break;
+	    }
+	  if (c > 0xFFFF)
+	    {
+	      c -= 0x10000;
+	      u[j++] = 0xD800 + (c >> 10);
+	      u[j++] = 0xDC00 + (c & 0x3FF);
+	    }
+	  else
+	    {
+	      u[j++] = c;
+	    }
+	}
+      if (i != count || j != len)
+	{
+	  [NSException raise: NSInternalInconsistencyException
+		      format: @"malformed UTF-32 constant string"];
+	}
+    }
+  return u;
+}
+#endif
+
 
 /**
  * <p>The NXConstantString class is used by the compiler for constant
@@ -6195,8 +6265,20 @@ constantIsEqual(NXConstantString *self, id anObject)
 	    }
 	  return (const char*)r;
 	}
-      case 4: // UTF-32
-	return [super UTF8String];
+      case 3: // UTF-32
+	{
+	  unsigned int l = 0;
+	  unsigned char *r = 0;
+
+	  if (GSFromUnicode(&r, &l, constantUnichars(self), nxcslen,
+	    NSUTF8StringEncoding, NSDefaultMallocZone(),
+	    GSUniTerminate|GSUniTemporary|GSUniStrict) == NO)
+	    {
+	      [NSException raise: NSCharacterConversionException
+			  format: @"Can't get UTF8 from Unicode string."];
+	    }
+	  return (const char*)r;
+	}
     }
   GS_UNREACHABLE();
 #else
@@ -6215,10 +6297,12 @@ constantIsEqual(NXConstantString *self, id anObject)
   switch (CONSTANT_STRING_ENCODING())
   {
       case 0: // ASCII
-      case 1: // UTF-8
 	  return nxcsptr[index];
       case 2: // UTF-16
 	  return ((unichar*)(void*)nxcsptr)[index];
+      case 1: // UTF-8 (index is in UTF-16 code units, not bytes)
+      case 3: // UTF-32
+	  return constantUnichars(self)[index];
   }
   GS_UNREACHABLE();
 #else
@@ -6362,13 +6446,14 @@ constantIsEqual(NXConstantString *self, id anObject)
 	    buffer[i] = (unichar)nxcsptr[aRange.location + i];
 	  }
 	return;
-      case 1: // UTF-8
-	NSAssert(0, @"UTF-8 constant strings not yet supported");
       case 2: // UTF-16
 	memcpy(buffer, nxcsptr + (aRange.location * sizeof(unichar)), aRange.length * sizeof(unichar));
 	return;
-      case 3:
-	NSAssert(0, @"UTF-32 constant strings not yet supported");
+      case 1: // UTF-8
+      case 3: // UTF-32
+	memcpy(buffer, constantUnichars(self) + aRange.location,
+	  aRange.length * sizeof(unichar));
+	return;
   }
   GS_UNREACHABLE();
 #else
